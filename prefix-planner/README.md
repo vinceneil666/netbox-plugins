@@ -27,6 +27,7 @@ the customer.
   *Run provisioning again* button and the object's Jobs tab (with the job log) are on the customer page.
 - **Existing tenants**: if a tenant with the customer name already exists, matched on name with any slug, it
   is reused.
+- **REST API**: full CRUD, a dry-run `preview` endpoint and a `run` endpoint to re-provision (see below).
 - IPv4 and IPv6.
 
 ![A provisioned customer](docs/customer.png)
@@ -116,6 +117,90 @@ Use the image for both the `netbox` and the `netbox-worker` services, and add th
 The name, prefix and plan can't be changed after creation, because they define what the job created. Delete the
 customer record and the objects it created if you need to start over.
 
+## REST API
+
+Everything the planner does is also available through the REST API at `/api/plugins/prefix-planner/`. It uses
+NetBox's standard API conventions: token authentication, object permissions, pagination, `?brief=1`, tags and
+custom fields.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/plugins/prefix-planner/customers/` | List customers. Filters: `q`, `customer_name`, `status`, `tenant_id`, `vrf_id`, `id`, `tag` |
+| `POST` | `/api/plugins/prefix-planner/customers/` | Create a customer; this starts the provisioning job |
+| `GET` | `/api/plugins/prefix-planner/customers/{id}/` | Get a customer, including where each prefix lands (`allocation`) |
+| `PATCH` / `PUT` | `/api/plugins/prefix-planner/customers/{id}/` | Update `comments`, `tags` or `custom_fields` |
+| `DELETE` | `/api/plugins/prefix-planner/customers/{id}/` | Delete the customer record. The tenant, VRF and prefixes it created are kept |
+| `POST` | `/api/plugins/prefix-planner/customers/preview/` | Dry run: allocate a plan without saving or creating anything |
+| `POST` | `/api/plugins/prefix-planner/customers/{id}/run/` | Queue the provisioning job again; returns the job (`202`) |
+
+### Fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `customer_name` | string | Required, unique. Becomes the tenant name |
+| `prefix` | string | Required. The customer's block, e.g. `10.20.0.0/16` |
+| `prefix_count` | integer | 1–64. Defaults to the number of `plan` rows, or 6 |
+| `plan` | list | Optional. Omit it for an equal split named `seg1`…`segN` |
+| `create_unused` | boolean | Also create the unused space as prefixes (default `false`) |
+| `status` | read-only | `pending`, `running`, `completed` or `failed` |
+| `tenant`, `vrf` | read-only | Set by the provisioning job |
+| `allocation` | read-only | `prefixes` (network and host range per row) and `unused` |
+| `comments`, `tags`, `custom_fields` | | Standard NetBox fields; the only fields you can change after creation |
+
+A `plan` row is `{"name": str, "prefixlen": int, "in_scope": bool, "locked": bool, "fixed": str}`. `name` and
+`prefixlen` are required; `in_scope` defaults to `true` and `locked` to `false`. A locked, in-scope row must give
+its pinned network in `fixed`. `customer_name`, `prefix`, `prefix_count`, `plan` and `create_unused` can't be
+changed after creation. Plans are checked exactly as in the planner, and errors come back as `400` with the
+offending field.
+
+### Examples
+
+Preview a plan:
+
+```bash
+curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/customers/preview/ \
+  -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+        "prefix": "10.30.0.0/16",
+        "plan": [
+          {"name": "Mgmt", "prefixlen": 20, "locked": true, "fixed": "10.30.240.0/20"},
+          {"name": "Clients", "prefixlen": 18},
+          {"name": "Voice", "prefixlen": 19, "in_scope": false}
+        ]
+      }'
+```
+
+```json
+{
+  "prefix": "10.30.0.0/16",
+  "prefix_count": 3,
+  "allocated_percent": 31.25,
+  "prefixes": [
+    {"name": "Mgmt", "prefixlen": 20, "in_scope": true, "locked": true,
+     "network": "10.30.240.0/20", "first_host": "10.30.240.1", "last_host": "10.30.255.254"},
+    {"name": "Clients", "prefixlen": 18, "in_scope": true, "locked": false,
+     "network": "10.30.128.0/18", "first_host": "10.30.128.1", "last_host": "10.30.191.254"},
+    {"name": "Voice", "prefixlen": 19, "in_scope": false, "locked": false,
+     "network": null, "first_host": null, "last_host": null}
+  ],
+  "unused": ["10.30.0.0/17", "10.30.192.0/19", "10.30.224.0/20"]
+}
+```
+
+Create a customer. The response is `201` with `status` `pending`; the job sets it to `completed`:
+
+```bash
+curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/customers/ \
+  -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '{"customer_name": "ACME Corp", "prefix": "10.20.0.0/16", "create_unused": true,
+       "plan": [{"name": "Servers", "prefixlen": 18}, {"name": "Clients", "prefixlen": 18}]}'
+```
+
+With just `customer_name` and `prefix`, you get the default equal split into 6 prefixes.
+
+Permissions follow NetBox's object permissions on *customer*: *view* to read, *add* to create or preview, *change*
+to update or re-run, and *delete* to delete.
+
 ## How the allocation works
 
 Prefix sizes are powers of two, and the plan is placed with buddy allocation:
@@ -141,6 +226,11 @@ cd prefix-planner
 pip install pytest netaddr
 pytest
 ```
+
+## Changelog
+
+- **0.2.0**: REST API (`/api/plugins/prefix-planner/customers/`, including `preview` and `run`).
+- **0.1.0**: first release: slider planner, locks, names, unused space, provisioning job.
 
 ## License
 
