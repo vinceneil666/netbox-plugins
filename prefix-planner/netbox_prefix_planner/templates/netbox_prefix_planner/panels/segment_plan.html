@@ -1,0 +1,33 @@
+{% extends "ui/panels/_base.html" %}
+
+{% block panel_content %}
+  <table class="table table-hover attr-table">
+    <thead>
+      <tr><th>Name</th><th>Size</th><th>Network</th><th>Host range</th></tr>
+    </thead>
+    <tbody>
+      {% for row in object.planned_segments %}
+        <tr{% if not row.network %} class="text-muted"{% endif %}>
+          <td>{{ row.name }}{% if row.locked %} <span class="mdi mdi-lock text-muted" title="Locked at this network"></span>{% endif %}</td>
+          <td>/{{ row.prefixlen }}</td>
+          {% if row.network %}
+            <td class="font-monospace">{{ row.network }}</td>
+            <td class="font-monospace small">{{ row.first_host }} – {{ row.last_host }}</td>
+          {% else %}
+            <td colspan="2"><span class="badge text-bg-secondary">out of scope</span></td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      {% if object.create_unused %}
+        {% for network in object.unused_prefixes %}
+          <tr class="text-muted">
+            <td><em>unused</em></td>
+            <td>/{{ network.prefixlen }}</td>
+            <td class="font-monospace">{{ network }}</td>
+            <td class="small">created as container "unused"</td>
+          </tr>
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+{% endblock panel_content %}

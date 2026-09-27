@@ -1,0 +1,12 @@
+{% extends 'generic/object.html' %}
+
+{% block extra_controls %}
+  {% if perms.netbox_prefix_planner.change_customerprovisioning %}
+    <form action="{% url 'plugins:netbox_prefix_planner:customerprovisioning_run' pk=object.pk %}" method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        <span class="mdi mdi-play" aria-hidden="true"></span> Run provisioning again
+      </button>
+    </form>
+  {% endif %}
+{% endblock extra_controls %}

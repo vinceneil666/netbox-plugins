@@ -1,0 +1,10 @@
+{% extends 'generic/object_edit.html' %}
+
+{% block pre_form_fields %}
+  <style>
+    /* NetBox caps edit forms at 800px; the prefix planner needs room */
+    form.object-edit { max-width: 1240px; }
+    /* Give the planner the full row - its fieldset heading already says "Prefixes" */
+    form.object-edit .row:has(> .col .segplanner) > .col-sm-3 { display: none; }
+  </style>
+{% endblock pre_form_fields %}
