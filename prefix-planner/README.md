@@ -236,7 +236,7 @@ pytest
 
 ## Changelog
 
-- **Unreleased**: different tenants may overlap. A VRF per tenant is created only while NetBox's
+- **0.5.0**: different tenants may overlap. A VRF per tenant is created only while NetBox's
   `ENFORCE_GLOBAL_UNIQUE` is on, with a note on the plan saying so; otherwise the global table is used. The
   decision is stored with the plan (`use_vrf`, `vrf_note`). The job only updates the tenant's own prefixes and
   never another tenant's.
