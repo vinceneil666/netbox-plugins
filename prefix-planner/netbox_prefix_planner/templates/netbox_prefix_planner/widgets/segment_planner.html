@@ -297,7 +297,7 @@
         netInput.addEventListener("change", () => {
           clearErr();
           const text = netInput.value.trim();
-          if (text && text !== netInput.defaultValue) {
+          if (text && (text !== netInput.defaultValue || !rows[i].locked)) {   // retyping the current one locks it
             const msg = setNetwork(i, text);
             if (msg) netErr = { i, text, msg };
           }
