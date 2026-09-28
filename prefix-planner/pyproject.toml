@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "netbox-prefix-planner"
 dynamic = ["version"]
-description = "NetBox plugin: plan a customer's address block with sliders and provision tenant, VRF and prefixes in one go"
+description = "NetBox plugin: plan a tenant's address block with sliders and provision the tenant and its prefixes in one go"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"

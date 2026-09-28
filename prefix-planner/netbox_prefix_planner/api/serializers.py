@@ -14,7 +14,7 @@ from ..choices import ProvisioningStatusChoices
 from ..models import CustomerProvisioning
 
 # These define what the provisioning job created, so they can't change afterwards (same as the UI)
-IMMUTABLE_FIELDS = ("customer_name", "prefix", "segment_count", "segment_plan", "create_unused")
+IMMUTABLE_FIELDS = ("tenant", "tenant_name", "prefix", "segment_count", "segment_plan", "create_unused")
 
 # Model field -> API field, for error messages raised by the model's clean()
 API_NAMES = {"segment_count": "prefix_count", "segment_plan": "plan"}
@@ -67,7 +67,7 @@ def serialize_allocation(rows, unused):
 
 
 class CustomerProvisioningSerializer(NetBoxModelSerializer):
-    prefix = IPNetworkField(help_text="Address block assigned to the customer, e.g. 10.20.0.0/16")
+    prefix = IPNetworkField(help_text="Address block assigned to the tenant, e.g. 10.20.0.0/16")
     prefix_count = serializers.IntegerField(
         source="segment_count", required=False, min_value=1, max_value=64,
         help_text="Number of prefixes to carve out. Defaults to the number of plan rows, or 6.",
@@ -78,8 +78,15 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
                   "(names seg1..segN). Locked in-scope rows must give their pinned network in 'fixed'.",
     )
     status = ChoiceField(choices=ProvisioningStatusChoices, read_only=True)
-    tenant = TenantSerializer(nested=True, read_only=True)
-    vrf = VRFSerializer(nested=True, read_only=True)
+    tenant = TenantSerializer(
+        nested=True, required=False, allow_null=True,
+        help_text="An existing tenant. Omit it and give tenant_name to have the job create a new tenant.",
+    )
+    tenant_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=100,
+        help_text="Name of the tenant to create. Set automatically when an existing tenant is given.",
+    )
+    vrf = VRFSerializer(nested=True, read_only=True, help_text="Only set on plans provisioned before 0.4.0")
     allocation = serializers.SerializerMethodField(
         help_text="Where each planned prefix lands, plus the unused space",
     )
@@ -87,11 +94,11 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
     class Meta:
         model = CustomerProvisioning
         fields = [
-            "id", "url", "display_url", "display", "customer_name", "prefix", "prefix_count", "plan",
-            "create_unused", "status", "tenant", "vrf", "allocation", "comments", "tags", "custom_fields",
+            "id", "url", "display_url", "display", "tenant", "tenant_name", "prefix", "prefix_count", "plan",
+            "create_unused", "status", "vrf", "allocation", "comments", "tags", "custom_fields",
             "created", "last_updated",
         ]
-        brief_fields = ("id", "url", "display", "customer_name", "prefix", "status")
+        brief_fields = ("id", "url", "display", "tenant_name", "prefix", "status")
 
     def validate_plan(self, value):
         return validate_plan_rows(value)
@@ -101,9 +108,12 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
             for field in IMMUTABLE_FIELDS:
                 if field in data and data[field] != getattr(self.instance, field):
                     raise serializers.ValidationError({API_NAMES.get(field, field): "Can't be changed after the "
-                                                                                    "customer is created."})
-        elif "segment_plan" in data and "segment_count" not in data:
-            data["segment_count"] = len(data["segment_plan"]) or 6
+                                                                                    "plan is created."})
+        else:
+            if "segment_plan" in data and "segment_count" not in data:
+                data["segment_count"] = len(data["segment_plan"]) or 6
+            # clean() does this on a throwaway instance; the saved record needs it too
+            data["tenant_name"] = data["tenant"].name if data.get("tenant") else data.get("tenant_name", "").strip()
         try:
             return super().validate(data)
         except DjangoValidationError as e:
@@ -118,7 +128,7 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
 
 
 class PlanPreviewSerializer(serializers.Serializer):
-    """Input for the dry-run endpoint: same planning fields as a customer, nothing is saved."""
+    """Input for the dry-run endpoint: same planning fields as a tenant plan, nothing is saved."""
     prefix = IPNetworkField()
     prefix_count = serializers.IntegerField(required=False, min_value=1, max_value=64)
     plan = serializers.JSONField(required=False)

@@ -1,9 +1,9 @@
 # Prefix Planner
 
-A [NetBox](https://github.com/netbox-community/netbox) plugin for onboarding a customer's address space in one step.
-Type the customer name and the block assigned to them, size the prefixes with sliders, and save. A background job
-creates the tenant, a VRF, the customer's container prefix and one container per planned prefix, all attached to
-the customer.
+A [NetBox](https://github.com/netbox-community/netbox) plugin for onboarding a tenant's address space in one step.
+Pick an existing tenant or name a new one, enter the block assigned to it, size the prefixes with sliders, and
+save. A background job creates the tenant (if new), the tenant's container prefix and one container per planned
+prefix, all attached to the tenant.
 
 ![The prefix planner](docs/planner.png)
 
@@ -28,27 +28,30 @@ the customer.
 - **What you see is what you get**: the browser and the server run the same allocation algorithm, and the server
   re-validates every plan before anything is created.
 - **Safe to re-run**: the provisioning job reuses existing objects and never creates duplicates. A
-  *Run provisioning again* button and the object's Jobs tab (with the job log) are on the customer page.
-- **Existing tenants**: if a tenant with the customer name already exists, matched on name with any slug, it
-  is reused.
+  *Run provisioning again* button and the object's Jobs tab (with the job log) are on the plan's page.
+- **Existing or new tenants**: choose a tenant from the list, or keep *Add new tenant* and type a name. A name
+  that matches an existing tenant (case-insensitive, or by slug) is rejected, so tenants are never duplicated. A
+  tenant can have several plans, e.g. an IPv4 and an IPv6 block.
+- **No overlaps**: prefixes go in the global table, so a block that overlaps another tenant's prefixes, or
+  another plan's block, is rejected when you save.
 - **REST API**: full CRUD, a dry-run `preview` endpoint and a `run` endpoint to re-provision (see below).
 - IPv4 and IPv6.
 
-![A provisioned customer](docs/customer.png)
+![A provisioned tenant](docs/customer.png)
 
 ## What gets created
 
-For customer `ACME Corp` with `10.20.0.0/16`:
+For tenant `ACME Corp` with `10.20.0.0/16`:
 
 | Object | Details |
 |---|---|
-| Tenant | `ACME Corp`, reused if it already exists |
-| VRF | `ACME Corp`, enforce unique, tenant ACME Corp (see `vrf_per_customer`) |
+| Tenant | `ACME Corp`, only when *Add new tenant* was chosen |
 | Prefix | `10.20.0.0/16`, status *container*, description `ACME Corp address block` |
 | Prefix per planned row | status *container*, description = the row name, e.g. `10.20.128.0/18` → `Clients` |
 | Prefix per unused block | only with *Create prefixes for unused space*: status *container*, description `unused` |
 
-All prefixes get the customer's tenant and VRF.
+All prefixes get the tenant and go in the global table (no VRF). Plans provisioned before 0.4.0 keep the VRF
+they were created in, and re-running them still uses it.
 
 ## Requirements
 
@@ -66,12 +69,6 @@ Enable it in `configuration.py`:
 
 ```python
 PLUGINS = ["netbox_prefix_planner"]
-
-PLUGINS_CONFIG = {
-    "netbox_prefix_planner": {
-        "vrf_per_customer": True,
-    },
-}
 ```
 
 Then apply the migrations and restart NetBox and the background worker (`rqworker`), which runs the
@@ -97,16 +94,13 @@ RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python \
 Use the image for both the `netbox` and the `netbox-worker` services, and add the plugin to
 `configuration/plugins.py`.
 
-## Configuration
-
-| Setting | Default | Description |
-|---|---|---|
-| `vrf_per_customer` | `True` | Put each customer in its own VRF. MSP customers usually overlap in RFC 1918 space, so the VRF keeps their prefixes apart. With `False`, prefixes go in the global table and the job refuses blocks that overlap another tenant's prefixes. |
+The plugin has no settings. (`vrf_per_customer` was removed in 0.4.0 and is ignored.)
 
 ## Usage
 
-1. Go to **Plugins → Prefix Planner → Customers** and click **+**.
-2. Enter the **customer name** (this becomes the tenant) and the **prefix** assigned to them.
+1. Go to **Plugins → Prefix Planner → Tenants** and click **+**.
+2. Choose the **tenant** from the list, or keep **Add new tenant** and type the **new tenant name**. Then enter
+   the **prefix** assigned to the tenant.
 3. Set the **number of prefixes**. The planner starts with an equal split: 6 prefixes use an 8-way split,
    leaving 2 parts free.
 4. Plan:
@@ -116,11 +110,11 @@ Use the image for both the `netbox` and the `netbox-worker` services, and add th
    - or type a network in the *Network* column to place a prefix exactly there (locks it; *Esc* reverts),
    - untick *In scope* to leave a prefix out,
    - switch on *Create prefixes for unused space* if the free space should be registered too.
-5. Click **Create**. The job runs in the background; the customer page shows its status, the prefix plan and the
-   prefixes created.
+5. Click **Create**. The job runs in the background; the plan's page shows its status, the prefix plan and the
+   tenant's prefixes.
 
-The name, prefix and plan can't be changed after creation, because they define what the job created. Delete the
-customer record and the objects it created if you need to start over.
+The tenant, prefix and plan can't be changed after creation, because they define what the job created. Delete the
+plan and the objects it created if you need to start over.
 
 ## REST API
 
@@ -130,31 +124,32 @@ custom fields.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/plugins/prefix-planner/customers/` | List customers. Filters: `q`, `customer_name`, `status`, `tenant_id`, `vrf_id`, `id`, `tag` |
-| `POST` | `/api/plugins/prefix-planner/customers/` | Create a customer; this starts the provisioning job |
-| `GET` | `/api/plugins/prefix-planner/customers/{id}/` | Get a customer, including where each prefix lands (`allocation`) |
-| `PATCH` / `PUT` | `/api/plugins/prefix-planner/customers/{id}/` | Update `comments`, `tags` or `custom_fields` |
-| `DELETE` | `/api/plugins/prefix-planner/customers/{id}/` | Delete the customer record. The tenant, VRF and prefixes it created are kept |
-| `POST` | `/api/plugins/prefix-planner/customers/preview/` | Dry run: allocate a plan without saving or creating anything |
-| `POST` | `/api/plugins/prefix-planner/customers/{id}/run/` | Queue the provisioning job again; returns the job (`202`) |
+| `GET` | `/api/plugins/prefix-planner/tenants/` | List tenant plans. Filters: `q`, `tenant_name`, `status`, `tenant_id`, `vrf_id`, `id`, `tag` |
+| `POST` | `/api/plugins/prefix-planner/tenants/` | Create a tenant plan; this starts the provisioning job |
+| `GET` | `/api/plugins/prefix-planner/tenants/{id}/` | Get a tenant plan, including where each prefix lands (`allocation`) |
+| `PATCH` / `PUT` | `/api/plugins/prefix-planner/tenants/{id}/` | Update `comments`, `tags` or `custom_fields` |
+| `DELETE` | `/api/plugins/prefix-planner/tenants/{id}/` | Delete the plan. The tenant and prefixes it created are kept |
+| `POST` | `/api/plugins/prefix-planner/tenants/preview/` | Dry run: allocate a plan without saving or creating anything |
+| `POST` | `/api/plugins/prefix-planner/tenants/{id}/run/` | Queue the provisioning job again; returns the job (`202`) |
 
 ### Fields
 
 | Field | Type | Notes |
 |---|---|---|
-| `customer_name` | string | Required, unique. Becomes the tenant name |
-| `prefix` | string | Required. The customer's block, e.g. `10.20.0.0/16` |
+| `tenant` | id or object | An existing tenant, e.g. `"tenant": 5` |
+| `tenant_name` | string | Name of a new tenant, when `tenant` is not given. Filled in automatically otherwise |
+| `prefix` | string | Required. The tenant's block, e.g. `10.20.0.0/16` |
 | `prefix_count` | integer | 1–64. Defaults to the number of `plan` rows, or 6 |
 | `plan` | list | Optional. Omit it for an equal split named `seg1`…`segN` |
 | `create_unused` | boolean | Also create the unused space as prefixes (default `false`) |
 | `status` | read-only | `pending`, `running`, `completed` or `failed` |
-| `tenant`, `vrf` | read-only | Set by the provisioning job |
+| `vrf` | read-only | Only set on plans provisioned before 0.4.0 |
 | `allocation` | read-only | `prefixes` (network and host range per row) and `unused` |
 | `comments`, `tags`, `custom_fields` | | Standard NetBox fields; the only fields you can change after creation |
 
 A `plan` row is `{"name": str, "prefixlen": int, "in_scope": bool, "locked": bool, "fixed": str}`. `name` and
 `prefixlen` are required; `in_scope` defaults to `true` and `locked` to `false`. A locked, in-scope row must give
-its pinned network in `fixed`. `customer_name`, `prefix`, `prefix_count`, `plan` and `create_unused` can't be
+its pinned network in `fixed`. `tenant`, `tenant_name`, `prefix`, `prefix_count`, `plan` and `create_unused` can't be
 changed after creation. Plans are checked exactly as in the planner, and errors come back as `400` with the
 offending field.
 
@@ -163,7 +158,7 @@ offending field.
 Preview a plan:
 
 ```bash
-curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/customers/preview/ \
+curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/tenants/preview/ \
   -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
   -d '{
         "prefix": "10.30.0.0/16",
@@ -192,18 +187,19 @@ curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/customers/
 }
 ```
 
-Create a customer. The response is `201` with `status` `pending`; the job sets it to `completed`:
+Create a plan for a new tenant. The response is `201` with `status` `pending`; the job sets it to `completed`:
 
 ```bash
-curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/customers/ \
+curl -s -X POST https://netbox.example.com/api/plugins/prefix-planner/tenants/ \
   -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
-  -d '{"customer_name": "ACME Corp", "prefix": "10.20.0.0/16", "create_unused": true,
+  -d '{"tenant_name": "ACME Corp", "prefix": "10.20.0.0/16", "create_unused": true,
        "plan": [{"name": "Servers", "prefixlen": 18}, {"name": "Clients", "prefixlen": 18}]}'
 ```
 
-With just `customer_name` and `prefix`, you get the default equal split into 6 prefixes.
+For an existing tenant, send its id instead: `{"tenant": 5, "prefix": "10.30.0.0/16"}`. With just the tenant and
+the prefix, you get the default equal split into 6 prefixes.
 
-Permissions follow NetBox's object permissions on *customer*: *view* to read, *add* to create or preview, *change*
+Permissions follow NetBox's object permissions on *tenant* (this plugin's model): *view* to read, *add* to create or preview, *change*
 to update or re-run, and *delete* to delete.
 
 ## How the allocation works
@@ -234,8 +230,12 @@ pytest
 
 ## Changelog
 
+- **Unreleased**: choose an existing tenant or add a new one; "customers" are now "tenants" (UI, URLs and API:
+  `/api/plugins/prefix-planner/tenants/`, `customer_name` → `tenant_name`, `tenant` writable); no VRF is created
+  any more and the `vrf_per_customer` setting is gone; overlapping blocks are rejected when saving; a tenant can
+  have several plans.
 - **0.3.0**: type a network in the planner's *Network* column to place and lock a prefix manually.
-- **0.2.0**: REST API (`/api/plugins/prefix-planner/customers/`, including `preview` and `run`).
+- **0.2.0**: REST API (`/api/plugins/prefix-planner/tenants/`, including `preview` and `run`).
 - **0.1.0**: first release: slider planner, locks, names, unused space, provisioning job.
 
 ## License

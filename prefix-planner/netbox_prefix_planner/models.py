@@ -2,7 +2,10 @@ import math
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.urls import reverse
+
+from django.utils.text import slugify
 
 from ipam.fields import IPNetworkField
 from netbox.models import NetBoxModel
@@ -12,18 +15,24 @@ from .allocation import MIN_SEGMENT_PREFIXLEN, AllocationError, allocate, defaul
 from .choices import ProvisioningStatusChoices
 
 
+def overlapping(prefix):
+    """Filter for prefix fields that overlap `prefix` (inside it, or containing it)."""
+    return Q(prefix__net_contained_or_equal=prefix) | Q(prefix__net_contains=prefix)
+
+
 class CustomerProvisioning(JobsMixin, NetBoxModel):
-    customer_name = models.CharField(
+    """A tenant's address block and its prefix plan (shown as a "tenant" in the UI)."""
+    tenant_name = models.CharField(
         max_length=100,
-        unique=True,
-        help_text="Becomes the tenant name, e.g. ACME Corp",
+        blank=True,
+        help_text="Name of the tenant to create, e.g. ACME Corp",
     )
     prefix = IPNetworkField(
-        help_text="Address block assigned to the customer, e.g. 10.20.0.0/16",
+        help_text="Address block assigned to the tenant, e.g. 10.20.0.0/16",
     )
     segment_count = models.PositiveSmallIntegerField(
         default=6,
-        help_text="Number of prefixes to carve out of the customer block",
+        help_text="Number of prefixes to carve out of the tenant's block",
     )
     segment_plan = models.JSONField(
         default=list,
@@ -40,14 +49,15 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
         default=ProvisioningStatusChoices.PENDING,
         editable=False,
     )
+    # Chosen in the form, or set by the job when it creates the tenant named tenant_name
     tenant = models.ForeignKey(
         to="tenancy.Tenant",
         on_delete=models.SET_NULL,
         related_name="+",
         blank=True,
         null=True,
-        editable=False,
     )
+    # Only set on plans provisioned before 0.4.0, which created a VRF per tenant
     vrf = models.ForeignKey(
         to="ipam.VRF",
         on_delete=models.SET_NULL,
@@ -59,12 +69,12 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
     comments = models.TextField(blank=True)
 
     class Meta:
-        ordering = ("customer_name",)
-        verbose_name = "customer"
-        verbose_name_plural = "customers"
+        ordering = ("tenant_name", "prefix")
+        verbose_name = "tenant"
+        verbose_name_plural = "tenants"
 
     def __str__(self):
-        return self.customer_name
+        return f"{self.tenant_name} – {self.prefix}" if self.prefix else self.tenant_name
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_prefix_planner:customerprovisioning", args=[self.pk])
@@ -74,6 +84,41 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
 
     def clean(self):
         super().clean()
+        self.clean_plan()
+        if self.pk is None:
+            self.clean_tenant()
+
+    def clean_tenant(self):
+        """New plans: an existing tenant, or the name of one to create; the block must be free in the global table."""
+        from ipam.models import Prefix
+        from tenancy.models import Tenant
+
+        if self.tenant:
+            self.tenant_name = self.tenant.name
+        else:
+            self.tenant_name = (self.tenant_name or "").strip()
+            if not self.tenant_name:
+                raise ValidationError({"tenant_name": "Enter a name for the new tenant, or choose an existing one."})
+            existing = (Tenant.objects.filter(name__iexact=self.tenant_name).first()
+                        or Tenant.objects.filter(slug=slugify(self.tenant_name)).first())
+            if existing:
+                raise ValidationError({"tenant_name": f"Tenant {existing} already exists - choose it in the "
+                                                      f"Tenant list instead."})
+        if not self.prefix:
+            return
+        clash = Prefix.objects.filter(overlapping(self.prefix), vrf__isnull=True, tenant__isnull=False)
+        if self.tenant:
+            clash = clash.exclude(tenant=self.tenant)
+        if clash.exists():
+            raise ValidationError({"prefix": "Overlaps prefixes of another tenant: " + ", ".join(
+                f"{p.prefix} ({p.tenant})" for p in clash.select_related("tenant")[:5])})
+        planned = CustomerProvisioning.objects.filter(overlapping(self.prefix), vrf__isnull=True)
+        if planned.exists():
+            raise ValidationError({"prefix": "Overlaps the block of another plan: " + ", ".join(
+                str(p) for p in planned[:5])})
+
+    def clean_plan(self):
+        """Address arithmetic only - also used by the API's dry run."""
         if not self.prefix:
             return
         if self.prefix.ip != self.prefix.network:

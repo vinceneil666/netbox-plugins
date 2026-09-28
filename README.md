@@ -5,7 +5,7 @@ directory, is a separate Python package and can be installed on its own.
 
 | Plugin | Description | NetBox |
 |---|---|---|
-| [Prefix Planner](prefix-planner/) | Plan a customer's address block with sliders and provision the tenant, VRF and prefixes in one go. Includes a REST API. | 4.7+ |
+| [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
 
 ## Installing a plugin
 

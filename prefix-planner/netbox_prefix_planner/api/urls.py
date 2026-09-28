@@ -4,6 +4,6 @@ from . import views
 
 router = NetBoxRouter()
 router.APIRootView = views.PrefixPlannerRootView
-router.register("customers", views.CustomerProvisioningViewSet)
+router.register("tenants", views.CustomerProvisioningViewSet)
 
 urlpatterns = router.urls
