@@ -17,6 +17,10 @@ the customer.
   were adjusted flash so you can see what changed.
 - **Locks**: lock a prefix to pin it to its exact network. Locked prefixes are never resized, moved or dropped
   automatically; the others are fitted around them.
+- **Manual networks**: type a network into the *Network* column (`10.20.64.0/19`, or just `10.20.64.0` to keep
+  the current size) to place a prefix yourself. It is locked there automatically and the unlocked prefixes are
+  rebalanced around it. Networks outside the block, with host bits set or overlapping another locked prefix are
+  rejected with an explanation.
 - **Your own names**: every prefix has an editable name, which becomes the prefix description in NetBox.
 - **In or out of scope**: switch individual prefixes on or off.
 - **Unused space**: optionally create the space no prefix uses as well, as the fewest possible CIDRs, with the
@@ -109,6 +113,7 @@ Use the image for both the `netbox` and the `netbox-worker` services, and add th
    - drag a slider to resize a prefix,
    - type a name for each prefix,
    - click the lock to pin a prefix to its current network,
+   - or type a network in the *Network* column to place a prefix exactly there (locks it; *Esc* reverts),
    - untick *In scope* to leave a prefix out,
    - switch on *Create prefixes for unused space* if the free space should be registered too.
 5. Click **Create**. The job runs in the background; the customer page shows its status, the prefix plan and the
@@ -229,6 +234,7 @@ pytest
 
 ## Changelog
 
+- **Unreleased**: type a network in the planner's *Network* column to place and lock a prefix manually.
 - **0.2.0**: REST API (`/api/plugins/prefix-planner/customers/`, including `preview` and `run`).
 - **0.1.0**: first release: slider planner, locks, names, unused space, provisioning job.
 
