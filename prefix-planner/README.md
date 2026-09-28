@@ -3,7 +3,7 @@
 A [NetBox](https://github.com/netbox-community/netbox) plugin for onboarding a tenant's address space in one step.
 Pick an existing tenant or name a new one, enter the block assigned to it, size the prefixes with sliders, and
 save. A background job creates the tenant (if new), the tenant's container prefix and one container per planned
-prefix, all attached to the tenant.
+prefix, all attached to the tenant. Whether a VRF is needed follows NetBox's *Enforce global unique* setting.
 
 ![The prefix planner](docs/planner.png)
 
@@ -32,9 +32,11 @@ prefix, all attached to the tenant.
 - **Existing or new tenants**: choose a tenant from the list, or keep *Add new tenant* and type a name. A name
   that matches an existing tenant (case-insensitive, or by slug) is rejected, so tenants are never duplicated. A
   tenant can have several plans, e.g. an IPv4 and an IPv6 block.
-- **Tenants may overlap**: prefixes go in the global table, and different tenants can use overlapping space.
-  Identical prefixes for two tenants follow NetBox's `ENFORCE_GLOBAL_UNIQUE` setting: while it is on (NetBox's
-  default), such a plan is rejected when you save; turn it off to allow them.
+- **VRF only when needed**: tenants may overlap, even with identical prefixes. With NetBox's *Enforce global
+  unique* setting (`ENFORCE_GLOBAL_UNIQUE`) **off**, the prefixes go in the global table. With it **on**, NetBox
+  refuses duplicates there, so the job puts the tenant's prefixes in a VRF named after the tenant (reused if it
+  exists) and the plan shows a note saying why. The form tells you which applies before you save; the choice is
+  stored with the plan, so re-running it later keeps the prefixes where they are.
 - **REST API**: full CRUD, a dry-run `preview` endpoint and a `run` endpoint to re-provision (see below).
 - IPv4 and IPv6.
 
@@ -47,12 +49,13 @@ For tenant `ACME Corp` with `10.20.0.0/16`:
 | Object | Details |
 |---|---|
 | Tenant | `ACME Corp`, only when *Add new tenant* was chosen |
+| VRF | `ACME Corp`, enforce unique, only while *Enforce global unique* is on (reused if it exists) |
 | Prefix | `10.20.0.0/16`, status *container*, description `ACME Corp address block` |
 | Prefix per planned row | status *container*, description = the row name, e.g. `10.20.128.0/18` → `Clients` |
 | Prefix per unused block | only with *Create prefixes for unused space*: status *container*, description `unused` |
 
-All prefixes get the tenant and go in the global table (no VRF). Plans provisioned before 0.4.0 keep the VRF
-they were created in, and re-running them still uses it.
+All prefixes get the tenant, and go in the tenant's VRF or the global table as described above. Plans provisioned
+before 0.4.0 keep the VRF they were created in.
 
 ## Requirements
 
@@ -144,7 +147,9 @@ custom fields.
 | `plan` | list | Optional. Omit it for an equal split named `seg1`…`segN` |
 | `create_unused` | boolean | Also create the unused space as prefixes (default `false`) |
 | `status` | read-only | `pending`, `running`, `completed` or `failed` |
-| `vrf` | read-only | Only set on plans provisioned before 0.4.0 |
+| `use_vrf` | read-only | Whether the plan provisions into a VRF, decided from *Enforce global unique* when it was saved |
+| `vrf` | read-only | The tenant's VRF, or `null` for the global table |
+| `vrf_note` | read-only | Why the plan uses a VRF |
 | `allocation` | read-only | `prefixes` (network and host range per row) and `unused` |
 | `comments`, `tags`, `custom_fields` | | Standard NetBox fields; the only fields you can change after creation |
 
@@ -231,8 +236,10 @@ pytest
 
 ## Changelog
 
-- **Unreleased**: different tenants may overlap; only NetBox's own `ENFORCE_GLOBAL_UNIQUE` rule for identical
-  prefixes applies. The job only updates the tenant's own prefixes and never another tenant's.
+- **Unreleased**: different tenants may overlap. A VRF per tenant is created only while NetBox's
+  `ENFORCE_GLOBAL_UNIQUE` is on, with a note on the plan saying so; otherwise the global table is used. The
+  decision is stored with the plan (`use_vrf`, `vrf_note`). The job only updates the tenant's own prefixes and
+  never another tenant's.
 - **0.4.0**: choose an existing tenant or add a new one; "customers" are now "tenants" (UI, URLs and API:
   `/api/plugins/prefix-planner/tenants/`, `customer_name` → `tenant_name`, `tenant` writable); no VRF is created
   any more and the `vrf_per_customer` setting is gone; overlapping blocks are rejected when saving; a tenant can

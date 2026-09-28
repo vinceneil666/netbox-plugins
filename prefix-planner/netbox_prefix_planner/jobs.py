@@ -2,7 +2,7 @@ from django.db import transaction
 from django.utils.text import slugify
 
 from ipam.choices import PrefixStatusChoices
-from ipam.models import Prefix
+from ipam.models import VRF, Prefix
 from netbox.jobs import JobRunner
 from tenancy.models import Tenant
 
@@ -48,8 +48,17 @@ class ProvisionCustomerJob(JobRunner):
         else:
             self.logger.info(f"Using existing tenant {tenant}")
 
-        # Plans from before 0.4.0 keep the VRF they were provisioned in; new plans use the global table
         vrf = obj.vrf
+        if vrf is None and obj.use_vrf:
+            # Decided when the plan was saved: NetBox's ENFORCE_GLOBAL_UNIQUE was on
+            vrf, created = VRF.objects.get_or_create(name=tenant.name,
+                                                     defaults={"tenant": tenant, "enforce_unique": True})
+            if vrf.tenant_id not in (None, tenant.pk):
+                raise ValueError(f"VRF {vrf} already exists and belongs to tenant {vrf.tenant}")
+            self.logger.info(f"VRF {vrf} {'created' if created else 'already exists - using it'} "
+                             f"(Enforce global unique was on when the plan was saved)")
+        elif vrf is None:
+            self.logger.info("Using the global table (Enforce global unique was off when the plan was saved)")
         name = tenant.name
 
         self.ensure_container(obj.prefix, vrf, tenant, f"{name} address block")

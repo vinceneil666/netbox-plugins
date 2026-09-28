@@ -86,7 +86,7 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
         required=False, allow_blank=True, max_length=100,
         help_text="Name of the tenant to create. Set automatically when an existing tenant is given.",
     )
-    vrf = VRFSerializer(nested=True, read_only=True, help_text="Only set on plans provisioned before 0.4.0")
+    vrf = VRFSerializer(nested=True, read_only=True, help_text="The VRF the prefixes are in (null = global table)")
     allocation = serializers.SerializerMethodField(
         help_text="Where each planned prefix lands, plus the unused space",
     )
@@ -95,7 +95,7 @@ class CustomerProvisioningSerializer(NetBoxModelSerializer):
         model = CustomerProvisioning
         fields = [
             "id", "url", "display_url", "display", "tenant", "tenant_name", "prefix", "prefix_count", "plan",
-            "create_unused", "status", "vrf", "allocation", "comments", "tags", "custom_fields",
+            "create_unused", "status", "use_vrf", "vrf", "vrf_note", "allocation", "comments", "tags", "custom_fields",
             "created", "last_updated",
         ]
         brief_fields = ("id", "url", "display", "tenant_name", "prefix", "status")

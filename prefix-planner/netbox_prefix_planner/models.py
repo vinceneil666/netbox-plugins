@@ -3,7 +3,6 @@ import math
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
-
 from django.utils.text import slugify
 
 from ipam.fields import IPNetworkField
@@ -13,6 +12,14 @@ from netbox.models.features import JobsMixin
 
 from .allocation import MIN_SEGMENT_PREFIXLEN, AllocationError, allocate, default_plan
 from .choices import ProvisioningStatusChoices
+
+VRF_NOTE = ("VRF created because NetBox's \"Enforce global unique\" setting was on when this plan was saved, "
+            "so tenants can't share prefixes in the global table.")
+
+
+def vrf_required():
+    """With ENFORCE_GLOBAL_UNIQUE on, overlapping tenants can't share the global table - they need a VRF each."""
+    return bool(get_config().ENFORCE_GLOBAL_UNIQUE)
 
 
 class CustomerProvisioning(JobsMixin, NetBoxModel):
@@ -52,7 +59,18 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
         blank=True,
         null=True,
     )
-    # Only set on plans provisioned before 0.4.0, which created a VRF per tenant
+    # Decided when the plan is saved, from NetBox's ENFORCE_GLOBAL_UNIQUE; re-runs keep the same placement
+    use_vrf = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text="Provision into a VRF named after the tenant instead of the global table",
+    )
+    vrf_note = models.CharField(
+        max_length=300,
+        blank=True,
+        editable=False,
+        help_text="Why the plan uses a VRF",
+    )
     vrf = models.ForeignKey(
         to="ipam.VRF",
         on_delete=models.SET_NULL,
@@ -77,6 +95,12 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
     def get_status_color(self):
         return ProvisioningStatusChoices.colors.get(self.status)
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.use_vrf and vrf_required():
+            self.use_vrf = True
+            self.vrf_note = VRF_NOTE
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         self.clean_plan()
@@ -85,7 +109,6 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
 
     def clean_tenant(self):
         """New plans: an existing tenant, or the name of one to create."""
-        from ipam.models import Prefix
         from tenancy.models import Tenant
 
         if self.tenant:
@@ -99,22 +122,6 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
             if existing:
                 raise ValidationError({"tenant_name": f"Tenant {existing} already exists - choose it in the "
                                                       f"Tenant list instead."})
-        if not self.prefix:
-            return
-        # Tenants may overlap each other. NetBox only refuses identical prefixes in the global table, and only
-        # while ENFORCE_GLOBAL_UNIQUE is on - catch that here rather than in the job
-        if not get_config().ENFORCE_GLOBAL_UNIQUE:
-            return
-        wanted = [str(self.prefix)] + [str(row["network"]) for row in self.planned_segments if row["network"]]
-        if self.create_unused:
-            wanted += [str(network) for network in self.unused_prefixes]
-        taken = Prefix.objects.filter(vrf__isnull=True, tenant__isnull=False, prefix__in=wanted)
-        if self.tenant:
-            taken = taken.exclude(tenant=self.tenant)
-        if taken.exists():
-            raise ValidationError({"prefix": "Already in the global table for another tenant: " + ", ".join(
-                f"{p.prefix} ({p.tenant})" for p in taken.select_related("tenant")[:5]) + ". NetBox's "
-                "ENFORCE_GLOBAL_UNIQUE setting (Admin - Configuration) forbids duplicate prefixes."})
 
     def clean_plan(self):
         """Address arithmetic only - also used by the API's dry run."""

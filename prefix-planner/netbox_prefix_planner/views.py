@@ -19,12 +19,18 @@ class CustomerProvisioningPanel(ObjectAttributesPanel):
     create_unused = attrs.BooleanAttr("create_unused", label="Create unused")
     status = attrs.ChoiceAttr("status")
     vrf = attrs.RelatedObjectAttr("vrf", linkify=True, label="VRF")
+    vrf_note = attrs.TextAttr("vrf_note", label="Note")
 
     def get_context(self, context):
         ctx = super().get_context(context)
-        # Only plans provisioned before 0.4.0 have a VRF - don't show an empty row on newer ones
-        if ctx["object"].vrf_id is None:
-            ctx["attrs"] = [a for a in ctx["attrs"] if a["label"] != "VRF"]
+        obj = ctx["object"]
+        # Plans in the global table have no VRF and no note - don't show empty rows for them
+        hide = set()
+        if obj.vrf_id is None and not obj.use_vrf:
+            hide.add("VRF")
+        if not obj.vrf_note:
+            hide.add("Note")
+        ctx["attrs"] = [a for a in ctx["attrs"] if a["label"] not in hide]
         return ctx
 
 
