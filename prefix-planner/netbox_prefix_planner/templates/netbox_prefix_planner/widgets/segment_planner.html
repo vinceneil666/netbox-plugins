@@ -27,8 +27,9 @@
     <div class="small text-muted">
       Drag a slider to resize a prefix. If the prefixes no longer fit, the largest other unlocked prefix is halved;
       when none can shrink further, the last unlocked one is marked out of scope. A locked prefix keeps its exact
-      network and is never changed automatically. The name becomes the prefix description. Out-of-scope prefixes
-      are not created.
+      network and is never changed automatically. Type a network (e.g. <code>10.20.64.0/19</code>, or just the
+      address to keep the size) to place a prefix yourself; it is locked there automatically. The name becomes the
+      prefix description. Out-of-scope prefixes are not created.
     </div>
   </div>
 </div>
@@ -59,6 +60,8 @@
   .segplanner .lock-btn.locked { color:#fff; background:var(--tblr-warning, #f59f00); border-color:transparent; }
   .segplanner tr.locked input[type=range] { opacity:.55; }
   .segplanner .hosts { font-size:.75rem; }
+  .segplanner .net-input { font-size:.8rem; padding-top:.1rem; padding-bottom:.1rem; }
+  .segplanner tr.locked .net-input { border-color:var(--tblr-warning, #f59f00); }
   .segplanner .unused-rows td { color:var(--tblr-secondary, #888); border-top-style:dashed; }
 </style>
 
@@ -81,6 +84,7 @@
 
   let p = null;        // parsed parent prefix: {version, net (BigInt), len, bits, min}
   let rows = [];       // [{name, prefixlen, in_scope, locked, fixed}]  fixed = offset (BigInt units) when locked
+  let netErr = null;   // {i, text, msg}: a typed network that was rejected, shown until fixed or reverted
 
   // ---- address helpers ------------------------------------------------------------------
   function parseAddr(text) {
@@ -233,6 +237,27 @@
     return bumped;
   }
 
+  // A network typed into the Network column: validate it, then lock the row there. Returns an error or "".
+  // Without "/len" the row keeps its current size.
+  function setNetwork(i, text) {
+    const m = text.trim().match(/^([0-9a-fA-F:.]+)(?:\/(\d{1,3}))?$/);
+    const a = m && parseAddr(m[1]);
+    if (!a) return "Not a valid network";
+    if (a.version !== p.version) return `Expected an IPv${p.version} network`;
+    const len = m[2] === undefined ? rows[i].prefixlen : parseInt(m[2], 10);
+    if (len <= p.len || len > p.min) return `Size must be /${p.len + 1} to /${p.min}`;
+    if (a.n < p.net || a.n >= p.net + addresses(p.len)) return `Outside ${formatAddr(p.net)}/${p.len}`;
+    const misalign = (a.n - p.net) % addresses(len);
+    if (misalign) return `Not a network address - did you mean ${formatAddr(a.n - misalign)}/${len}?`;
+    const off = (a.n - p.net) / addresses(p.min);
+    const clash = rows.findIndex((r, j) => j !== i && r.in_scope && r.locked && r.fixed !== undefined &&
+                                          off < r.fixed + units(r.prefixlen) && r.fixed < off + units(len));
+    if (clash >= 0) return `Overlaps locked prefix ${rows[clash].name}`;
+    Object.assign(rows[i], { prefixlen: len, in_scope: true, locked: true, fixed: off });
+    update(rebalance(i));                                   // unlocked prefixes make room around it
+    return "";
+  }
+
   function nameProblems() {
     const seen = {};
     rows.forEach(r => { const k = r.name.trim().toLowerCase(); seen[k] = (seen[k] || 0) + 1; });
@@ -256,25 +281,45 @@
             <input type="text" class="form-control form-control-sm" maxlength="100" spellcheck="false"></div></td>
         <td><input type="range" class="form-range" min="0" max="${p.min - p.len - 1}" step="1">
             <div class="size-label small text-muted"></div></td>
-        <td><div class="net font-monospace small"></div><div class="hosts font-monospace text-muted"></div></td>`;
+        <td><input type="text" class="form-control form-control-sm font-monospace net-input" spellcheck="false"
+                   autocomplete="off" title="Type a network to place this prefix there - it is locked automatically">
+            <div class="hosts font-monospace text-muted"></div></td>`;
       const box = tr.querySelector("input[type=checkbox]");
       const lock = tr.querySelector(".lock-btn");
       const nameInput = tr.querySelector("input[type=text]");
       const slider = tr.querySelector("input[type=range]");
+      const netInput = tr.querySelector(".net-input");
       nameInput.value = r.name;
+      const clearErr = () => { if (netErr && netErr.i === i) netErr = null; };
       if (readOnly) {
-        [box, lock, nameInput, slider].forEach(el => (el.disabled = true));
+        [box, lock, nameInput, slider, netInput].forEach(el => (el.disabled = true));
       } else {
+        netInput.addEventListener("change", () => {
+          clearErr();
+          const text = netInput.value.trim();
+          if (text && (text !== netInput.defaultValue || !rows[i].locked)) {   // retyping the current one locks it
+            const msg = setNetwork(i, text);
+            if (msg) netErr = { i, text, msg };
+          }
+          update();                                         // an emptied or unchanged field reverts
+        });
+        netInput.addEventListener("keydown", e => {
+          if (e.key === "Enter") { e.preventDefault(); netInput.dispatchEvent(new Event("change")); }
+          if (e.key === "Escape") { e.preventDefault(); clearErr(); update(); }
+        });
         slider.addEventListener("input", () => {
+          clearErr();
           rows[i].prefixlen = p.min - Number(slider.value);   // slider right = bigger prefix
           rows[i].in_scope = true;
           update(rebalance(i));
         });
         box.addEventListener("change", () => {
+          clearErr();
           rows[i].in_scope = box.checked;
           update(box.checked ? rebalance(i) : new Set());
         });
         lock.addEventListener("click", () => {
+          clearErr();
           rows[i].locked = !rows[i].locked;
           // pin the prefix to the network it has right now
           if (rows[i].locked && rows[i].in_scope) rows[i].fixed = allocate().placed[i];
@@ -333,19 +378,26 @@
       lock.classList.toggle("locked", r.locked);
       lock.querySelector(".mdi").className = "mdi " + (r.locked ? "mdi-lock" : "mdi-lock-open-variant-outline");
       lock.title = r.locked ? "Locked at this network - never changed automatically. Click to unlock."
-                            : "Lock this prefix at its current network";
+                            : "Lock this prefix at its current network (or type a network)";
       nameInput.classList.toggle("is-invalid", !!problems[i]);
       nameInput.title = problems[i];
       tr.querySelector(".size-label").textContent =
         `/${r.prefixlen} · ${addresses(r.prefixlen).toLocaleString()} · ${pct(units(r.prefixlen), cap)}%`;
-      if (placed[i] !== null) {
+      const netInput = tr.querySelector(".net-input");
+      const hosts = tr.querySelector(".hosts");
+      const err = netErr && netErr.i === i ? netErr.msg : "";
+      netInput.defaultValue = placed[i] !== null ? cidr(placed[i], r.prefixlen) : "";
+      netInput.value = err ? netErr.text : netInput.defaultValue;
+      netInput.placeholder = placed[i] !== null ? "" : "out of scope";
+      netInput.classList.toggle("is-invalid", !!err);
+      hosts.classList.toggle("text-danger", !!err);
+      hosts.classList.toggle("text-muted", !err);
+      if (err) {
+        hosts.textContent = err;
+      } else if (placed[i] !== null) {
         const [first, last] = hostRange(placed[i], r.prefixlen);
-        tr.querySelector(".net").textContent = cidr(placed[i], r.prefixlen);
-        tr.querySelector(".hosts").textContent = `${formatAddr(first)} – ${formatAddr(last)}`;
-      } else {
-        tr.querySelector(".net").innerHTML = '<span class="badge text-bg-secondary">out of scope</span>';
-        tr.querySelector(".hosts").textContent = "";
-      }
+        hosts.textContent = `${formatAddr(first)} – ${formatAddr(last)}`;
+      } else hosts.textContent = "";
       if (bumped.has(i)) { tr.classList.remove("bumped"); void tr.offsetWidth; tr.classList.add("bumped"); }
     });
 
@@ -395,6 +447,7 @@
   }
 
   function reset(keepSaved) {
+    netErr = null;
     const next = parsePrefix(prefixEl && prefixEl.value);
     const count = Math.max(1, Math.min(64, parseInt(countEl && countEl.value, 10) || 6));
     if (!next) {
@@ -425,5 +478,13 @@
   }
   last = `${prefixEl && prefixEl.value}|${countEl && countEl.value}`;
   reset(true);                                              // keep a plan that came back with a form error
+
+  // Don't submit while a typed network is still rejected - the saved plan would silently ignore it
+  const form = root.closest("form");
+  if (form && !readOnly) form.addEventListener("submit", e => {
+    if (!netErr || !p) return;
+    e.preventDefault();
+    tbody.rows[netErr.i].querySelector(".net-input").focus();
+  });
 })();
 </script>
