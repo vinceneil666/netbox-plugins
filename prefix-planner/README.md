@@ -234,7 +234,7 @@ pytest
 
 ## Changelog
 
-- **Unreleased**: type a network in the planner's *Network* column to place and lock a prefix manually.
+- **0.3.0**: type a network in the planner's *Network* column to place and lock a prefix manually.
 - **0.2.0**: REST API (`/api/plugins/prefix-planner/customers/`, including `preview` and `run`).
 - **0.1.0**: first release: slider planner, locks, names, unused space, provisioning job.
 
