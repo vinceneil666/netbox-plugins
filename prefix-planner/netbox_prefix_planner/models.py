@@ -2,22 +2,24 @@ import math
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from django.urls import reverse
-
 from django.utils.text import slugify
 
 from ipam.fields import IPNetworkField
+from netbox.config import get_config
 from netbox.models import NetBoxModel
 from netbox.models.features import JobsMixin
 
 from .allocation import MIN_SEGMENT_PREFIXLEN, AllocationError, allocate, default_plan
 from .choices import ProvisioningStatusChoices
 
+VRF_NOTE = ("VRF created because NetBox's \"Enforce global unique\" setting was on when this plan was saved, "
+            "so tenants can't share prefixes in the global table.")
 
-def overlapping(prefix):
-    """Filter for prefix fields that overlap `prefix` (inside it, or containing it)."""
-    return Q(prefix__net_contained_or_equal=prefix) | Q(prefix__net_contains=prefix)
+
+def vrf_required():
+    """With ENFORCE_GLOBAL_UNIQUE on, overlapping tenants can't share the global table - they need a VRF each."""
+    return bool(get_config().ENFORCE_GLOBAL_UNIQUE)
 
 
 class CustomerProvisioning(JobsMixin, NetBoxModel):
@@ -57,7 +59,18 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
         blank=True,
         null=True,
     )
-    # Only set on plans provisioned before 0.4.0, which created a VRF per tenant
+    # Decided when the plan is saved, from NetBox's ENFORCE_GLOBAL_UNIQUE; re-runs keep the same placement
+    use_vrf = models.BooleanField(
+        default=False,
+        editable=False,
+        help_text="Provision into a VRF named after the tenant instead of the global table",
+    )
+    vrf_note = models.CharField(
+        max_length=300,
+        blank=True,
+        editable=False,
+        help_text="Why the plan uses a VRF",
+    )
     vrf = models.ForeignKey(
         to="ipam.VRF",
         on_delete=models.SET_NULL,
@@ -82,6 +95,12 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
     def get_status_color(self):
         return ProvisioningStatusChoices.colors.get(self.status)
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.use_vrf and vrf_required():
+            self.use_vrf = True
+            self.vrf_note = VRF_NOTE
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         self.clean_plan()
@@ -89,8 +108,7 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
             self.clean_tenant()
 
     def clean_tenant(self):
-        """New plans: an existing tenant, or the name of one to create; the block must be free in the global table."""
-        from ipam.models import Prefix
+        """New plans: an existing tenant, or the name of one to create."""
         from tenancy.models import Tenant
 
         if self.tenant:
@@ -104,18 +122,6 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
             if existing:
                 raise ValidationError({"tenant_name": f"Tenant {existing} already exists - choose it in the "
                                                       f"Tenant list instead."})
-        if not self.prefix:
-            return
-        clash = Prefix.objects.filter(overlapping(self.prefix), vrf__isnull=True, tenant__isnull=False)
-        if self.tenant:
-            clash = clash.exclude(tenant=self.tenant)
-        if clash.exists():
-            raise ValidationError({"prefix": "Overlaps prefixes of another tenant: " + ", ".join(
-                f"{p.prefix} ({p.tenant})" for p in clash.select_related("tenant")[:5])})
-        planned = CustomerProvisioning.objects.filter(overlapping(self.prefix), vrf__isnull=True)
-        if planned.exists():
-            raise ValidationError({"prefix": "Overlaps the block of another plan: " + ", ".join(
-                str(p) for p in planned[:5])})
 
     def clean_plan(self):
         """Address arithmetic only - also used by the API's dry run."""

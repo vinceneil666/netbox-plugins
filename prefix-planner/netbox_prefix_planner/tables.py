@@ -18,4 +18,4 @@ class CustomerProvisioningTable(NetBoxTable):
         model = CustomerProvisioning
         fields = ("pk", "id", "tenant_name", "prefix", "segment_count", "status", "tenant", "vrf",
                   "tags", "created", "last_updated")
-        default_columns = ("tenant_name", "prefix", "segment_count", "status")
+        default_columns = ("tenant_name", "prefix", "segment_count", "status", "vrf")

@@ -7,7 +7,7 @@ from utilities.forms.fields import CommentField, DynamicModelChoiceField, TagFil
 from utilities.forms.rendering import FieldSet
 
 from .choices import ProvisioningStatusChoices
-from .models import CustomerProvisioning
+from .models import CustomerProvisioning, vrf_required
 from .widgets import InPlannerCheckbox, SegmentPlannerWidget
 
 
@@ -57,6 +57,16 @@ class CustomerProvisioningForm(NetBoxModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            # Tell the user up front where the prefixes will go (decided by NetBox's ENFORCE_GLOBAL_UNIQUE)
+            if vrf_required():
+                where = ("NetBox's \"Enforce global unique\" setting is on, so the prefixes go in a VRF named after "
+                         "the tenant.")
+            else:
+                where = ("NetBox's \"Enforce global unique\" setting is off, so the prefixes go in the global table "
+                         "and may overlap other tenants.")
+            self.fields["prefix"].help_text = f"{self.fields['prefix'].help_text}. {where}"
+
         # Tenant/prefix/plan drive what the job created; changing them afterwards would orphan objects
         if self.instance.pk:
             for field in ("tenant", "tenant_name", "prefix", "segment_count", "segment_plan", "create_unused"):
