@@ -9,14 +9,22 @@ directory, is a separate Python package and can be installed on its own.
 
 ## Installing a plugin
 
-Install a plugin straight from this repository with pip, using its directory as `subdirectory`:
+Install a released version of a plugin with pip, using the release tag and the plugin's directory as
+`subdirectory`:
 
 ```bash
 source /opt/netbox/venv/bin/activate
-pip install "git+https://github.com/vinceneil666/netbox-plugins.git#subdirectory=prefix-planner"
+pip install "git+https://github.com/vinceneil666/netbox-plugins.git@prefix-planner-v0.5.0#subdirectory=prefix-planner"
 ```
 
-Then follow the plugin's own README to enable and configure it.
+Leave out `@<tag>` to install the latest code from `main`. Then follow the plugin's own README to enable and
+configure it.
+
+## Releases
+
+Each plugin is released on its own. Tags are named `<plugin>-v<version>`, e.g. `prefix-planner-v0.5.0`, and every
+[release](https://github.com/vinceneil666/netbox-plugins/releases) has the plugin's wheel and source package
+attached.
 
 ## License
 

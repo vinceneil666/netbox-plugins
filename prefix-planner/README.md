@@ -64,10 +64,20 @@ before 0.4.0 keep the VRF they were created in.
 
 ## Installation
 
+Install the latest release (see [Releases](https://github.com/vinceneil666/netbox-plugins/releases)):
+
 ```bash
 source /opt/netbox/venv/bin/activate
-pip install "git+https://github.com/vinceneil666/netbox-plugins.git#subdirectory=prefix-planner"
+pip install "git+https://github.com/vinceneil666/netbox-plugins.git@prefix-planner-v0.5.0#subdirectory=prefix-planner"
 ```
+
+or the wheel attached to the release:
+
+```bash
+pip install https://github.com/vinceneil666/netbox-plugins/releases/download/prefix-planner-v0.5.0/netbox_prefix_planner-0.5.0-py3-none-any.whl
+```
+
+Leave out `@prefix-planner-v0.5.0` to install the latest code from `main` instead.
 
 Enable it in `configuration.py`:
 
@@ -92,7 +102,7 @@ Build an image with the plugin, as described in
 ```dockerfile
 FROM docker.io/netboxcommunity/netbox:v4.7
 RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python \
-      "git+https://github.com/vinceneil666/netbox-plugins.git#subdirectory=prefix-planner"
+      "git+https://github.com/vinceneil666/netbox-plugins.git@prefix-planner-v0.5.0#subdirectory=prefix-planner"
 ```
 
 Use the image for both the `netbox` and the `netbox-worker` services, and add the plugin to
