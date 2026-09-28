@@ -230,7 +230,7 @@ pytest
 
 ## Changelog
 
-- **Unreleased**: choose an existing tenant or add a new one; "customers" are now "tenants" (UI, URLs and API:
+- **0.4.0**: choose an existing tenant or add a new one; "customers" are now "tenants" (UI, URLs and API:
   `/api/plugins/prefix-planner/tenants/`, `customer_name` → `tenant_name`, `tenant` writable); no VRF is created
   any more and the `vrf_per_customer` setting is gone; overlapping blocks are rejected when saving; a tenant can
   have several plans.

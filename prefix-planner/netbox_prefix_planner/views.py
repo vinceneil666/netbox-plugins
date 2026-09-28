@@ -18,7 +18,14 @@ class CustomerProvisioningPanel(ObjectAttributesPanel):
     segment_count = attrs.NumericAttr("segment_count", label="Prefixes")
     create_unused = attrs.BooleanAttr("create_unused", label="Create unused")
     status = attrs.ChoiceAttr("status")
-    vrf = attrs.RelatedObjectAttr("vrf", linkify=True, label="VRF (before 0.4.0)")
+    vrf = attrs.RelatedObjectAttr("vrf", linkify=True, label="VRF")
+
+    def get_context(self, context):
+        ctx = super().get_context(context)
+        # Only plans provisioned before 0.4.0 have a VRF - don't show an empty row on newer ones
+        if ctx["object"].vrf_id is None:
+            ctx["attrs"] = [a for a in ctx["attrs"] if a["label"] != "VRF"]
+        return ctx
 
 
 @register_model_view(CustomerProvisioning, "list", path="", detail=False)
