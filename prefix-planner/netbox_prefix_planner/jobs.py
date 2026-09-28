@@ -2,22 +2,22 @@ from django.db import transaction
 from django.utils.text import slugify
 
 from ipam.choices import PrefixStatusChoices
-from ipam.models import VRF, Prefix
+from ipam.models import Prefix
 from netbox.jobs import JobRunner
-from netbox.plugins import get_plugin_config
 from tenancy.models import Tenant
 
 from .choices import ProvisioningStatusChoices
+from .models import overlapping
 
 
 class ProvisionCustomerJob(JobRunner):
     """
-    Create (or bring up to date) the tenant, VRF, customer container prefix and seg1..segN containers.
+    Create (or bring up to date) the tenant, the tenant's container prefix and one container per planned prefix.
     Safe to re-run: existing objects are reused, never duplicated.
     """
 
     class Meta:
-        name = "Provision customer"
+        name = "Provision tenant"
 
     def run(self, *args, **kwargs):
         obj = self.job.object
@@ -34,28 +34,30 @@ class ProvisionCustomerJob(JobRunner):
         obj.save()
 
     def provision(self, obj):
-        name = obj.customer_name
-        # Attach to an existing tenant with this name (any slug) before falling back to creating one
-        tenant = Tenant.objects.filter(name__iexact=name).first() or Tenant.objects.filter(slug=slugify(name)).first()
-        created = tenant is None
-        if created:
-            tenant = Tenant(name=name, slug=slugify(name))
-            tenant.full_clean()
-            tenant.save()
-        self.logger.info(f"Tenant {tenant} {'created' if created else 'already exists - attaching to it'}")
-
-        vrf = None
-        if get_plugin_config("netbox_prefix_planner", "vrf_per_customer"):
-            vrf, created = VRF.objects.get_or_create(
-                name=name, defaults={"tenant": tenant, "enforce_unique": True}
-            )
-            self.logger.info(f"VRF {vrf} {'created' if created else 'already exists'}")
+        tenant = obj.tenant
+        if tenant is None:
+            name = obj.tenant_name
+            # A tenant with this name may have appeared since the plan was saved - attach to it then
+            tenant = (Tenant.objects.filter(name__iexact=name).first()
+                      or Tenant.objects.filter(slug=slugify(name)).first())
+            created = tenant is None
+            if created:
+                tenant = Tenant(name=name, slug=slugify(name))
+                tenant.full_clean()
+                tenant.save()
+            self.logger.info(f"Tenant {tenant} {'created' if created else 'already exists - attaching to it'}")
         else:
-            # Shared global table: refuse to overlap another tenant's space
-            clash = Prefix.objects.filter(vrf__isnull=True, prefix__net_overlap=obj.prefix).exclude(tenant=tenant)
+            self.logger.info(f"Using existing tenant {tenant}")
+
+        # Plans from before 0.4.0 keep the VRF they were provisioned in; new plans use the global table
+        vrf = obj.vrf
+        if vrf is None:
+            clash = Prefix.objects.filter(overlapping(obj.prefix), vrf__isnull=True, tenant__isnull=False)
+            clash = clash.exclude(tenant=tenant)
             if clash.exists():
-                raise ValueError(f"{obj.prefix} overlaps existing global prefix(es): "
-                                 f"{', '.join(str(p.prefix) for p in clash[:5])}")
+                raise ValueError(f"{obj.prefix} overlaps prefixes of another tenant: "
+                                 f"{', '.join(f'{p.prefix} ({p.tenant})' for p in clash[:5])}")
+        name = tenant.name
 
         self.ensure_container(obj.prefix, vrf, tenant, f"{name} address block")
         for row in obj.planned_segments:

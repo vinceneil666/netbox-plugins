@@ -7,7 +7,7 @@ from .models import CustomerProvisioning
 
 @receiver(post_save, sender=CustomerProvisioning)
 def enqueue_provisioning(sender, instance, created, **kwargs):
-    """Kick off the provisioning job when a new customer is entered."""
+    """Kick off the provisioning job when a new tenant plan is saved."""
     if not created:
         return
     from .jobs import ProvisionCustomerJob

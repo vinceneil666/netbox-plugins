@@ -2,7 +2,8 @@ from django import forms
 
 from ipam.formfields import IPNetworkFormField
 from netbox.forms import NetBoxModelFilterSetForm, NetBoxModelForm
-from utilities.forms.fields import CommentField, TagFilterField
+from tenancy.models import Tenant
+from utilities.forms.fields import CommentField, DynamicModelChoiceField, TagFilterField
 from utilities.forms.rendering import FieldSet
 
 from .choices import ProvisioningStatusChoices
@@ -10,14 +11,31 @@ from .models import CustomerProvisioning
 from .widgets import InPlannerCheckbox, SegmentPlannerWidget
 
 
+NEW_TENANT = "Add new tenant"
+
+
 class CustomerProvisioningForm(NetBoxModelForm):
-    prefix = IPNetworkFormField(label="Prefix", help_text="Address block assigned to the customer, e.g. 10.20.0.0/16")
+    tenant = DynamicModelChoiceField(
+        queryset=Tenant.objects.all(),
+        required=False,
+        null_option=NEW_TENANT,
+        empty_label=None,  # no blank entry, so "Add new tenant" is the default
+        label="Tenant",
+        help_text="An existing tenant, or \"Add new tenant\" to create one",
+    )
+    tenant_name = forms.CharField(
+        label="New tenant name",
+        max_length=100,
+        required=False,
+        help_text="The tenant to create, e.g. ACME Corp",
+    )
+    prefix = IPNetworkFormField(label="Prefix", help_text="Address block assigned to the tenant, e.g. 10.20.0.0/16")
     segment_count = forms.IntegerField(
         label="Number of prefixes",
         min_value=1,
         max_value=64,
         initial=6,
-        help_text="How many prefixes to carve out of the customer block",
+        help_text="How many prefixes to carve out of the tenant's block",
     )
     segment_plan = forms.JSONField(
         label="Prefixes",
@@ -29,19 +47,19 @@ class CustomerProvisioningForm(NetBoxModelForm):
     comments = CommentField()
 
     fieldsets = (
-        FieldSet("customer_name", "prefix", "tags", name="Customer"),
+        FieldSet("tenant", "tenant_name", "prefix", "tags", name="Tenant"),
         FieldSet("segment_count", "segment_plan", name="Prefixes"),
     )
 
     class Meta:
         model = CustomerProvisioning
-        fields = ("customer_name", "prefix", "segment_count", "segment_plan", "create_unused", "comments", "tags")
+        fields = ("tenant", "tenant_name", "prefix", "segment_count", "segment_plan", "create_unused", "comments", "tags")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Name/prefix/plan drive what the job created; changing them afterwards would orphan objects
+        # Tenant/prefix/plan drive what the job created; changing them afterwards would orphan objects
         if self.instance.pk:
-            for field in ("customer_name", "prefix", "segment_count", "segment_plan", "create_unused"):
+            for field in ("tenant", "tenant_name", "prefix", "segment_count", "segment_plan", "create_unused"):
                 self.fields[field].disabled = True
             if not self.instance.segment_plan and self.instance.prefix:
                 self.initial["segment_plan"] = self.instance.get_plan()

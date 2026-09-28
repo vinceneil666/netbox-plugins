@@ -13,13 +13,19 @@ from .models import CustomerProvisioning
 
 
 class CustomerProvisioningPanel(ObjectAttributesPanel):
-    customer_name = attrs.TextAttr("customer_name", label="Customer")
+    tenant = attrs.RelatedObjectAttr("tenant", linkify=True)
     prefix = attrs.TextAttr("prefix")
     segment_count = attrs.NumericAttr("segment_count", label="Prefixes")
     create_unused = attrs.BooleanAttr("create_unused", label="Create unused")
     status = attrs.ChoiceAttr("status")
-    tenant = attrs.RelatedObjectAttr("tenant", linkify=True)
     vrf = attrs.RelatedObjectAttr("vrf", linkify=True, label="VRF")
+
+    def get_context(self, context):
+        ctx = super().get_context(context)
+        # Only plans provisioned before 0.4.0 have a VRF - don't show an empty row on newer ones
+        if ctx["object"].vrf_id is None:
+            ctx["attrs"] = [a for a in ctx["attrs"] if a["label"] != "VRF"]
+        return ctx
 
 
 @register_model_view(CustomerProvisioning, "list", path="", detail=False)
@@ -43,7 +49,7 @@ class CustomerProvisioningView(generic.ObjectView):
         right_panels=[
             ObjectsTablePanel(
                 "ipam.prefix",
-                title="Customer prefixes",
+                title="Tenant prefixes",
                 # 0 matches nothing until the job has created the tenant
                 filters={"tenant_id": lambda ctx: ctx["object"].tenant_id or 0},
                 include_columns=["prefix", "status", "tenant", "vrf", "utilization", "description"],

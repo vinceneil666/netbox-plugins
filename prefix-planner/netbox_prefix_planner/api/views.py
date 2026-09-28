@@ -38,12 +38,12 @@ class CustomerProvisioningViewSet(NetBoxModelViewSet):
         data.is_valid(raise_exception=True)
         plan = data.validated_data.get("plan") or []
         count = data.validated_data.get("prefix_count") or len(plan) or 6
-        # Run the same validation as a real customer, on an instance that is never saved
+        # Run the same plan validation as a real tenant plan, on an instance that is never saved
         candidate = CustomerProvisioning(
-            customer_name="preview", prefix=data.validated_data["prefix"], segment_count=count, segment_plan=plan,
+            tenant_name="preview", prefix=data.validated_data["prefix"], segment_count=count, segment_plan=plan,
         )
         try:
-            candidate.clean()
+            candidate.clean_plan()
         except ValidationError as e:
             return Response(api_errors(e.message_dict), status=status.HTTP_400_BAD_REQUEST)
         rows, unused = allocate(candidate.prefix, candidate.get_plan())
@@ -61,7 +61,7 @@ class CustomerProvisioningViewSet(NetBoxModelViewSet):
     def run(self, request, pk=None):
         """Queue the (idempotent) provisioning job again."""
         if not request.user.has_perm("netbox_prefix_planner.change_customerprovisioning"):
-            raise PermissionDenied("You need permission to change customers to run provisioning.")
-        customer = self.get_object()
-        job = ProvisionCustomerJob.enqueue(instance=customer, user=request.user)
+            raise PermissionDenied("You need permission to change tenant plans to run provisioning.")
+        plan = self.get_object()
+        job = ProvisionCustomerJob.enqueue(instance=plan, user=request.user)
         return Response(JobSerializer(job, context={"request": request}).data, status=status.HTTP_202_ACCEPTED)

@@ -8,3 +8,32 @@
     form.object-edit .row:has(> .col .segplanner) > .col-sm-3 { display: none; }
   </style>
 {% endblock pre_form_fields %}
+
+{% block modals %}
+  {{ block.super }}
+  <script>
+    // "New tenant name" only applies while the Tenant list is on "Add new tenant"
+    (function () {
+      const select = document.getElementById("id_tenant");
+      const name = document.getElementById("id_tenant_name");
+      if (!select || !name) return;
+      const row = name.closest(".row");
+      function sync() {
+        const isNew = !select.value || select.value === "null";
+        row.hidden = !isNew;
+        name.required = isNew && !name.disabled;
+      }
+      select.addEventListener("change", sync);
+      sync();
+
+      // Keep "Add new tenant" at the top of the list (it would tie with the first loaded tenant)
+      window.addEventListener("load", () => {
+        const ts = select.tomselect;
+        if (!ts) return;
+        const pin = () => { if (ts.options.null) ts.options.null.$order = 0; };
+        pin();
+        ts.on("load", () => { pin(); ts.refreshOptions(false); });
+      });
+    })();
+  </script>
+{% endblock modals %}
