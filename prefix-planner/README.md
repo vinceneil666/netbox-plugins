@@ -32,8 +32,9 @@ prefix, all attached to the tenant.
 - **Existing or new tenants**: choose a tenant from the list, or keep *Add new tenant* and type a name. A name
   that matches an existing tenant (case-insensitive, or by slug) is rejected, so tenants are never duplicated. A
   tenant can have several plans, e.g. an IPv4 and an IPv6 block.
-- **No overlaps**: prefixes go in the global table, so a block that overlaps another tenant's prefixes, or
-  another plan's block, is rejected when you save.
+- **Tenants may overlap**: prefixes go in the global table, and different tenants can use overlapping space.
+  Identical prefixes for two tenants follow NetBox's `ENFORCE_GLOBAL_UNIQUE` setting: while it is on (NetBox's
+  default), such a plan is rejected when you save; turn it off to allow them.
 - **REST API**: full CRUD, a dry-run `preview` endpoint and a `run` endpoint to re-provision (see below).
 - IPv4 and IPv6.
 
@@ -230,6 +231,8 @@ pytest
 
 ## Changelog
 
+- **Unreleased**: different tenants may overlap; only NetBox's own `ENFORCE_GLOBAL_UNIQUE` rule for identical
+  prefixes applies. The job only updates the tenant's own prefixes and never another tenant's.
 - **0.4.0**: choose an existing tenant or add a new one; "customers" are now "tenants" (UI, URLs and API:
   `/api/plugins/prefix-planner/tenants/`, `customer_name` → `tenant_name`, `tenant` writable); no VRF is created
   any more and the `vrf_per_customer` setting is gone; overlapping blocks are rejected when saving; a tenant can

@@ -7,7 +7,6 @@ from netbox.jobs import JobRunner
 from tenancy.models import Tenant
 
 from .choices import ProvisioningStatusChoices
-from .models import overlapping
 
 
 class ProvisionCustomerJob(JobRunner):
@@ -51,12 +50,6 @@ class ProvisionCustomerJob(JobRunner):
 
         # Plans from before 0.4.0 keep the VRF they were provisioned in; new plans use the global table
         vrf = obj.vrf
-        if vrf is None:
-            clash = Prefix.objects.filter(overlapping(obj.prefix), vrf__isnull=True, tenant__isnull=False)
-            clash = clash.exclude(tenant=tenant)
-            if clash.exists():
-                raise ValueError(f"{obj.prefix} overlaps prefixes of another tenant: "
-                                 f"{', '.join(f'{p.prefix} ({p.tenant})' for p in clash[:5])}")
         name = tenant.name
 
         self.ensure_container(obj.prefix, vrf, tenant, f"{name} address block")
@@ -72,12 +65,13 @@ class ProvisionCustomerJob(JobRunner):
         obj.tenant, obj.vrf = tenant, vrf
 
     def ensure_container(self, prefix, vrf, tenant, description):
-        pfx = Prefix.objects.filter(prefix=str(prefix), vrf=vrf).first()
+        # Another tenant may have the same network; only update this tenant's own prefix, or claim an unowned one.
+        # A duplicate is then created - NetBox's full_clean() refuses it while ENFORCE_GLOBAL_UNIQUE is on.
+        existing = Prefix.objects.filter(prefix=str(prefix), vrf=vrf)
+        pfx = existing.filter(tenant=tenant).first() or existing.filter(tenant__isnull=True).first()
         if pfx is None:
             pfx = Prefix(prefix=str(prefix), vrf=vrf)
             action = "created"
-        elif pfx.tenant_id not in (None, tenant.pk):
-            raise ValueError(f"{prefix} already exists and belongs to tenant {pfx.tenant}")
         else:
             action = "updated"
         pfx.tenant = tenant

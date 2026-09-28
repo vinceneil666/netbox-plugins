@@ -2,22 +2,17 @@ import math
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from django.urls import reverse
 
 from django.utils.text import slugify
 
 from ipam.fields import IPNetworkField
+from netbox.config import get_config
 from netbox.models import NetBoxModel
 from netbox.models.features import JobsMixin
 
 from .allocation import MIN_SEGMENT_PREFIXLEN, AllocationError, allocate, default_plan
 from .choices import ProvisioningStatusChoices
-
-
-def overlapping(prefix):
-    """Filter for prefix fields that overlap `prefix` (inside it, or containing it)."""
-    return Q(prefix__net_contained_or_equal=prefix) | Q(prefix__net_contains=prefix)
 
 
 class CustomerProvisioning(JobsMixin, NetBoxModel):
@@ -89,7 +84,7 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
             self.clean_tenant()
 
     def clean_tenant(self):
-        """New plans: an existing tenant, or the name of one to create; the block must be free in the global table."""
+        """New plans: an existing tenant, or the name of one to create."""
         from ipam.models import Prefix
         from tenancy.models import Tenant
 
@@ -106,16 +101,20 @@ class CustomerProvisioning(JobsMixin, NetBoxModel):
                                                       f"Tenant list instead."})
         if not self.prefix:
             return
-        clash = Prefix.objects.filter(overlapping(self.prefix), vrf__isnull=True, tenant__isnull=False)
+        # Tenants may overlap each other. NetBox only refuses identical prefixes in the global table, and only
+        # while ENFORCE_GLOBAL_UNIQUE is on - catch that here rather than in the job
+        if not get_config().ENFORCE_GLOBAL_UNIQUE:
+            return
+        wanted = [str(self.prefix)] + [str(row["network"]) for row in self.planned_segments if row["network"]]
+        if self.create_unused:
+            wanted += [str(network) for network in self.unused_prefixes]
+        taken = Prefix.objects.filter(vrf__isnull=True, tenant__isnull=False, prefix__in=wanted)
         if self.tenant:
-            clash = clash.exclude(tenant=self.tenant)
-        if clash.exists():
-            raise ValidationError({"prefix": "Overlaps prefixes of another tenant: " + ", ".join(
-                f"{p.prefix} ({p.tenant})" for p in clash.select_related("tenant")[:5])})
-        planned = CustomerProvisioning.objects.filter(overlapping(self.prefix), vrf__isnull=True)
-        if planned.exists():
-            raise ValidationError({"prefix": "Overlaps the block of another plan: " + ", ".join(
-                str(p) for p in planned[:5])})
+            taken = taken.exclude(tenant=self.tenant)
+        if taken.exists():
+            raise ValidationError({"prefix": "Already in the global table for another tenant: " + ", ".join(
+                f"{p.prefix} ({p.tenant})" for p in taken.select_related("tenant")[:5]) + ". NetBox's "
+                "ENFORCE_GLOBAL_UNIQUE setting (Admin - Configuration) forbids duplicate prefixes."})
 
     def clean_plan(self):
         """Address arithmetic only - also used by the API's dry run."""
