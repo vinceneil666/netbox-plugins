@@ -6,6 +6,7 @@ directory, is a separate Python package and can be installed on its own.
 | Plugin | Description | NetBox |
 |---|---|---|
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
+| [FortiManager Integrator](fortimanager-integrator/) | Push NetBox prefixes and IP addresses to FortiManager as firewall address objects, with a preview of every change. Includes a REST API. | 4.7+ |
 
 ## Installing a plugin
 
