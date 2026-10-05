@@ -18,6 +18,17 @@ built from your NetBox data.
 - The **jump park** in the middle of the city has a ramp: drive up it northwards at full speed and the car soars
   over the map, into a sky full of your NetBox **prefixes** flying around like birds, then lands again (steer a
   little in the air). J takes you to the bottom of the ramp.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/penguin.png" alt="A penguin crossing the road in front of the car, with a warning"></td>
+    <td width="50%"><img src="docs/jump.png" alt="In the air over the city, among prefixes flying like birds"></td>
+  </tr>
+  <tr>
+    <td>Brake for the penguin!</td>
+    <td>Off the ramp: the city below, prefixes flying like birds</td>
+  </tr>
+</table>
 - **Sound**: the engine follows your speed, the tyres squeal when you brake hard, buildings go *thud*, a parking
   spot beeps and a visit chimes; penguins peep and squawk, the jump whooshes, the wind blows and the prefix birds
   tweet. H is the horn, M turns the sound on and off (remembered in your browser). It is
@@ -38,8 +49,16 @@ NetBox 4.7 or later. No models, no migrations.
 ## Installation
 
 ```
-pip install "git+https://github.com/vinceneil666/netbox-plugins.git#subdirectory=roadtrip"
+pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.2.0#subdirectory=roadtrip"
 ```
+
+or the wheel attached to the [release](https://github.com/vinceneil666/netbox-plugins/releases/tag/roadtrip-v0.2.0):
+
+```
+pip install https://github.com/vinceneil666/netbox-plugins/releases/download/roadtrip-v0.2.0/netbox_roadtrip-0.2.0-py3-none-any.whl
+```
+
+Leave out `@roadtrip-v0.2.0` to install the latest code from `main`.
 
 ```python
 # configuration.py (netbox-docker: configuration/plugins.py)
@@ -74,7 +93,7 @@ with NetBox's menu hidden.
 
 ## Changelog
 
-### 0.2.0 (unreleased)
+### 0.2.0 (2026-10-05, first release: `roadtrip-v0.2.0`)
 
 - Districts sized for their own buildings and packed into rows - no more huge empty districts next to a big one.
 - Only what is on screen is drawn, labels are measured once: smooth with thousands of devices.
@@ -82,7 +101,7 @@ with NetBox's menu hidden.
 - Jump park with a ramp in the middle of the city: fly over the map among your prefixes, as birds (`max_prefixes`).
 - J key to the ramp; more sounds (penguins, jump, wind, birds); HUD counts penguins and jumps.
 
-### 0.1.0 (2026-10-05, merged to `main`, not released)
+### 0.1.0 (2026-10-05, merged to `main`)
 
 First version: tenant districts, device buildings in role colours, a sites district, parking spots that open the
 object's page, visited flags, minimap, sound effects (engine, skid, bump, park, arrival chime, horn; mute with M).
