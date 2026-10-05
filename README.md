@@ -7,6 +7,7 @@ directory, is a separate Python package and can be installed on its own.
 |---|---|---|
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
 | [FortiManager Integrator](fortimanager-integrator/) **(beta)** | Create FortiGates as FortiManager model devices from NetBox (blueprint, serial, ADOM from the tenant or an override) push their rendered config as a CLI script, and keep their per-device metadata variables in sync, with checks and readable logs. | 4.7+ |
+| [Road Trip](roadtrip/) **(just for fun)** | Drive a car through a city made of your tenants, sites and devices; stop at a building to open its NetBox page. | 4.7+ |
 
 ## Screenshots
 
