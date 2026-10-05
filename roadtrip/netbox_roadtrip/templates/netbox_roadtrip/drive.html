@@ -1,0 +1,69 @@
+{% extends 'generic/_base.html' %}
+
+{% block title %}Road Trip{% endblock %}
+{% block subtitle %}
+  <div class="text-muted">
+    Drive through a city built from your NetBox: every tenant is a district, every device a building (roof in its
+    role's colour), and the sites have their own district. Stop on a <strong>P</strong> in front of a building to
+    look inside.
+  </div>
+{% endblock %}
+
+{% block content %}
+  <style>
+    .rt-wrap { position: relative; height: calc(100vh - 230px); min-height: 420px; border-radius: 6px;
+               overflow: hidden; background: #3f7d3a; user-select: none; }
+    .rt-wrap canvas { display: block; width: 100%; height: 100%; outline: none; }
+    .rt-hud { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, .78); color: #f8fafc;
+              border-radius: 6px; padding: 8px 12px; font: 13px/1.45 system-ui, sans-serif; pointer-events: none;
+              min-width: 210px; }
+    .rt-hud .rt-big { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rt-hud .rt-muted { color: #cbd5e1; }
+    .rt-help { position: absolute; bottom: 10px; left: 10px; background: rgba(15, 23, 42, .7); color: #e2e8f0;
+               border-radius: 6px; padding: 6px 10px; font: 12px/1.4 system-ui, sans-serif; pointer-events: none; }
+    .rt-help kbd { background: #334155; color: #fff; border: 0; padding: 1px 5px; font-size: 11px; }
+    .rt-start { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                background: rgba(15, 23, 42, .45); color: #fff; font: 600 22px system-ui, sans-serif; cursor: pointer; }
+    .rt-start span { background: rgba(15, 23, 42, .85); padding: 14px 24px; border-radius: 8px; }
+    .rt-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .6); display: none;
+                align-items: center; justify-content: center; }
+    .rt-modal.rt-open { display: flex; }
+    .rt-dialog { width: min(1200px, 94vw); height: 86vh; background: var(--tblr-bg-surface, #fff); border-radius: 8px;
+                 display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+    .rt-dialog-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+                      border-bottom: 1px solid var(--tblr-border-color, #ddd); }
+    .rt-dialog-head h3 { margin: 0; font-size: 16px; flex: 1; }
+    .rt-dialog iframe { flex: 1; width: 100%; border: 0; }
+  </style>
+
+  <div class="rt-wrap" id="rt-wrap">
+    <canvas id="rt-canvas" tabindex="0" aria-label="Road Trip game - drive with the arrow keys"></canvas>
+    <div class="rt-hud" id="rt-hud"></div>
+    <div class="rt-help">
+      <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive
+      · <kbd>Space</kbd> brake · stop on a <strong>P</strong> to visit · <kbd>Esc</kbd> back on the road
+      · <kbd>H</kbd> horn · <kbd>M</kbd> sound on/off · <kbd>R</kbd> back to the start
+    </div>
+    <div class="rt-start" id="rt-start"><span>🚗 Click here, then drive with the arrow keys</span></div>
+  </div>
+
+  <div class="rt-modal" id="rt-modal" role="dialog" aria-modal="true" aria-labelledby="rt-modal-title">
+    <div class="rt-dialog">
+      <div class="rt-dialog-head">
+        <h3 id="rt-modal-title"></h3>
+        <a class="btn btn-sm btn-outline-primary" id="rt-modal-open" href="#" target="_top">
+          <i class="mdi mdi-open-in-new"></i> Open page
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" id="rt-modal-close">
+          <i class="mdi mdi-car-side"></i> Back on the road (Esc)
+        </button>
+      </div>
+      <iframe id="rt-frame" title="NetBox object"></iframe>
+    </div>
+  </div>
+
+  {{ world|json_script:"rt-data" }}
+  <script>
+{% include "netbox_roadtrip/game.js" %}
+  </script>
+{% endblock %}

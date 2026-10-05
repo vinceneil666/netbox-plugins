@@ -7,6 +7,7 @@ directory, is a separate Python package and can be installed on its own.
 |---|---|---|
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
 | [FortiManager Integrator](fortimanager-integrator/) **(beta)** | Create FortiGates as FortiManager model devices from NetBox (blueprint, serial, ADOM from the tenant or an override) push their rendered config as a CLI script, and keep their per-device metadata variables in sync, with checks and readable logs. | 4.7+ |
+| [Road Trip](roadtrip/) **(just for fun)** | Drive a car through a city made of your tenants, sites and devices; stop at a building to open its NetBox page. | 4.7+ |
 
 ## Screenshots
 
@@ -18,6 +19,14 @@ directory, is a separate Python package and can be installed on its own.
   <tr>
     <td><b>Prefix Planner</b> - size a tenant's prefixes with sliders</td>
     <td><b>FortiManager Integrator</b> (beta) - sync a FortiGate to FortiManager</td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="roadtrip/"><img src="roadtrip/docs/drive.png" alt="Road Trip: driving through a tenant district"></a></td>
+    <td width="50%"><a href="roadtrip/"><img src="roadtrip/docs/visit.png" alt="Road Trip: a device page opened from the game"></a></td>
+  </tr>
+  <tr>
+    <td><b>Road Trip</b> (just for fun) - drive through your tenants and devices</td>
+    <td><b>Road Trip</b> - stop at a building to open its NetBox page</td>
   </tr>
 </table>
 
