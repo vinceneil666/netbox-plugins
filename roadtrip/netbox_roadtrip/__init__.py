@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 class RoadTripConfig(PluginConfig):
@@ -13,6 +13,8 @@ class RoadTripConfig(PluginConfig):
     default_settings = {
         # At most this many devices are placed in the city
         "max_devices": 500,
+        # At most this many (random) prefixes fly around as birds when the car jumps
+        "max_prefixes": 150,
     }
 
 

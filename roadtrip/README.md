@@ -12,14 +12,21 @@ built from your NetBox data.
 - **Stop on the P** in front of a building and the object's NetBox page opens on top of the game. Press **Esc** (or
   *Back on the road*) to drive on, or *Open page* to go there for real.
 - Buildings you have visited get a 🚩, and the corner shows how many you have seen (kept in your browser).
+- **Penguins** sometimes waddle across the road in front of you (you hear them peep, and a yellow **!** shows when
+  you come fast). Brake and let them cross - hit one and your car spins out of control for a moment (the penguin
+  is fine, just dizzy 💫). The corner counts penguins let across and bumped.
+- The **jump park** in the middle of the city has a ramp: drive up it northwards at full speed and the car soars
+  over the map, into a sky full of your NetBox **prefixes** flying around like birds, then lands again (steer a
+  little in the air). J takes you to the bottom of the ramp.
 - **Sound**: the engine follows your speed, the tyres squeal when you brake hard, buildings go *thud*, a parking
-  spot beeps and a visit chimes. H is the horn, M turns the sound on and off (remembered in your browser). It is
+  spot beeps and a visit chimes; penguins peep and squawk, the jump whooshes, the wind blows and the prefix birds
+  tweet. H is the horn, M turns the sound on and off (remembered in your browser). It is
   all made on the fly with the browser's Web Audio API - no sound files.
 
 ![Parked at FGT-OSL-01: the device's NetBox page opens on top of the game](docs/visit.png)
 
-Controls: arrow keys or W A S D to drive, Space to brake, H for the horn, M for sound on/off, R to go back to the
-start. Roads are fast, the districts
+Controls: arrow keys or W A S D to drive, Space to brake, J to the jump ramp, H for the horn, M for sound on/off,
+R to go back to the start. Roads are fast, the districts
 slower, the grass slowest - and the buildings are solid.
 
 It only shows what you are allowed to see, reads nothing it doesn't need, and changes nothing.
@@ -46,15 +53,34 @@ Restart NetBox; **Road Trip → Drive** appears in the menu (`/plugins/roadtrip/
 
 | Setting | Default | |
 |---|---|---|
-| `max_devices` | `500` | At most this many devices are placed in the city. |
+| `max_devices` | `500` | At most this many devices are placed in the city (the first ones by name); the corner says so when some are left out. |
+| `max_prefixes` | `150` | At most this many prefixes, picked at random, fly around as birds during a jump. |
+
+For example, in `configuration.py` (netbox-docker: `configuration/plugins.py`):
+
+```python
+PLUGINS_CONFIG = {"netbox_roadtrip": {"max_devices": 2000}}
+```
+
+Each district is sized for its own buildings (a tenant with many devices gets a wide, square-ish district rather
+than a very long one), and only what is on screen is drawn: tested at about 60 frames per second with 2000 devices.
 
 ## How it works
 
-The page sends the tenants, sites and devices the user may view (`restrict(user, "view")`) as JSON; the city, the car
+The page sends the tenants, sites, devices and a random handful of prefixes the user may view
+(`restrict(user, "view")`) as JSON; the city, the car
 and the driving are plain JavaScript on a `<canvas>`, no libraries. The object pages open in a same-origin `<iframe>`
 with NetBox's menu hidden.
 
 ## Changelog
+
+### 0.2.0 (unreleased)
+
+- Districts sized for their own buildings and packed into rows - no more huge empty districts next to a big one.
+- Only what is on screen is drawn, labels are measured once: smooth with thousands of devices.
+- Penguins crossing the road: brake for them, or spin out.
+- Jump park with a ramp in the middle of the city: fly over the map among your prefixes, as birds (`max_prefixes`).
+- J key to the ramp; more sounds (penguins, jump, wind, birds); HUD counts penguins and jumps.
 
 ### 0.1.0 (2026-10-05, merged to `main`, not released)
 
