@@ -110,12 +110,79 @@
     try { localStorage.setItem(VISITED_KEY, JSON.stringify([...visited])); } catch (e) { /* no storage */ }
   }
 
+  // ---------------------------------------------------------------- sound (Web Audio, made on the fly - no files)
+  const MUTE_KEY = "netbox-roadtrip-muted";
+  let muted = false;
+  try { muted = localStorage.getItem(MUTE_KEY) === "1"; } catch (e) { /* no storage */ }
+  let audio = null, noiseBuffer = null;
+  const VOLUME = 0.5;
+
+  function initAudio() {   // browsers only allow sound after a click or key press
+    if (audio) { audio.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ac = new AC();
+    const master = ac.createGain(); master.gain.value = muted ? 0 : VOLUME; master.connect(ac.destination);
+    // engine: a low sawtooth plus a sub-octave square through a low-pass filter
+    const osc = ac.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 40;
+    const sub = ac.createOscillator(); sub.type = "square"; sub.frequency.value = 20;
+    const filter = ac.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 300; filter.Q.value = 4;
+    const engine = ac.createGain(); engine.gain.value = 0;
+    osc.connect(filter); sub.connect(filter); filter.connect(engine); engine.connect(master);
+    osc.start(); sub.start();
+    noiseBuffer = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    audio = { ctx: ac, master, osc, sub, filter, engine };
+  }
+  function setMuted(value) {
+    muted = value;
+    try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch (e) { /* no storage */ }
+    if (audio) audio.master.gain.setTargetAtTime(muted ? 0 : VOLUME, audio.ctx.currentTime, 0.02);
+  }
+  function engineSound(throttle) {
+    if (!audio) return;
+    const t = audio.ctx.currentTime, v = Math.abs(car.speed);
+    const running = started && !paused;
+    const pitch = 38 + v * 0.17 + (throttle ? 6 : 0);
+    audio.osc.frequency.setTargetAtTime(pitch, t, 0.06);
+    audio.sub.frequency.setTargetAtTime(pitch / 2, t, 0.06);
+    audio.filter.frequency.setTargetAtTime(260 + v * 1.6 + (throttle ? 350 : 0), t, 0.06);
+    audio.engine.gain.setTargetAtTime(running ? 0.05 + (throttle ? 0.04 : 0) + Math.min(v, 520) / 520 * 0.05 : 0, t, 0.08);
+  }
+  function tone(freq, start, duration, type, volume) {
+    if (!audio) return;
+    const t = audio.ctx.currentTime + start;
+    const o = audio.ctx.createOscillator(), g = audio.ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(volume, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    o.connect(g); g.connect(audio.master); o.start(t); o.stop(t + duration + 0.05);
+  }
+  function noise(duration, filterType, frequency, volume) {
+    if (!audio || !noiseBuffer) return;
+    const t = audio.ctx.currentTime;
+    const src = audio.ctx.createBufferSource(); src.buffer = noiseBuffer;
+    const f = audio.ctx.createBiquadFilter(); f.type = filterType; f.frequency.value = frequency; f.Q.value = 1.5;
+    const g = audio.ctx.createGain();
+    g.gain.setValueAtTime(volume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(f); f.connect(g); g.connect(audio.master); src.start(t); src.stop(t + duration + 0.05);
+  }
+  const sfx = {
+    bump(strength) { noise(0.25, "lowpass", 380, Math.min(0.9, 0.25 + strength / 500)); tone(70, 0, 0.18, "sine", 0.5); },
+    skid() { noise(0.35, "bandpass", 2300, 0.18); },
+    horn() { tone(415, 0, 0.38, "square", 0.12); tone(523, 0, 0.38, "square", 0.1); },
+    arrive() { [660, 880, 1320].forEach((f, i) => tone(f, i * 0.09, 0.32, "sine", 0.22)); },
+    park() { tone(990, 0, 0.07, "triangle", 0.15); },
+  };
+
   // ---------------------------------------------------------------- the car
   const START = { x: ROAD / 2, y: ROAD / 2, angle: Math.PI / 2 };   // top-left crossing, facing down
   const car = { x: START.x, y: START.y, angle: START.angle, speed: 0, w: 24, l: 44, hue: 0 };
   const keys = {};
   let started = false, paused = false;
-  let parkedAt = null, parkTimer = 0, lastVisit = null;
+  let parkedAt = null, parkTimer = 0, lastVisit = null, skidCooldown = 0, bumpCooldown = 0;
 
   function surfaceAt(x, y) {
     if (x < 0 || y < 0 || x > WORLD.w || y > WORLD.h) return "grass";
@@ -135,6 +202,9 @@
     else if (down) car.speed -= (car.speed > 0 ? 900 : 300) * dt;
     else car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 260 * dt);   // rolling to a stop
     if (brake) car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 1400 * dt);
+    skidCooldown -= dt; bumpCooldown -= dt;
+    const hardBrake = brake || (down && car.speed > 0) || (up && car.speed < 0);
+    if (hardBrake && Math.abs(car.speed) > 230 && skidCooldown <= 0) { sfx.skid(); skidCooldown = 0.3; }
     if (car.speed > max) car.speed = Math.max(max, car.speed - 700 * dt);                 // slowed down off-road
     car.speed = Math.max(-180, car.speed);
 
@@ -156,13 +226,14 @@
         const dist = Math.sqrt(dist2) || 0.01;
         car.x = cx + (dx / dist) * r; car.y = cy + (dy / dist) * r;
         if (dist2 === 0) car.y = b.y + b.h + r;
+        if (Math.abs(car.speed) > 40 && bumpCooldown <= 0) { sfx.bump(Math.abs(car.speed)); bumpCooldown = 0.25; }
         car.speed *= -0.3;
       }
     }
 
     // Parked on a P? Stand still there for a moment and you're in
     const spot = stops.find(p => car.x >= p.x && car.x <= p.x + p.w && car.y >= p.y && car.y <= p.y + p.h);
-    if (spot !== parkedAt) { parkedAt = spot || null; parkTimer = 0; }
+    if (spot !== parkedAt) { parkedAt = spot || null; parkTimer = 0; if (spot && spot !== lastVisit) sfx.park(); }
     if (!spot) lastVisit = null;
     if (spot && Math.abs(car.speed) < 12 && lastVisit !== spot) {
       parkTimer += dt;
@@ -173,6 +244,7 @@
   // ---------------------------------------------------------------- visiting a building
   function visit(item) {
     markVisited(item.key);
+    sfx.arrive();
     paused = true;
     Object.keys(keys).forEach(k => { keys[k] = false; });
     car.speed = 0;
@@ -213,16 +285,19 @@
     if (document.activeElement !== canvas) return;
     if (GAME_KEYS.includes(e.code)) { keys[e.code] = true; e.preventDefault(); }
     if (e.code === "KeyR") Object.assign(car, { x: START.x, y: START.y, angle: START.angle, speed: 0 });
+    if (e.code === "KeyH" && !e.repeat) sfx.horn();
+    if (e.code === "KeyM" && !e.repeat) setMuted(!muted);
   });
   window.addEventListener("keyup", e => { if (GAME_KEYS.includes(e.code)) keys[e.code] = false; });
   canvas.addEventListener("blur", () => Object.keys(keys).forEach(k => { keys[k] = false; }));
   function start() {
     started = true;
+    initAudio();
     startOverlay.style.display = "none";
     canvas.focus();
   }
   startOverlay.addEventListener("click", start);
-  canvas.addEventListener("click", () => { if (!started) start(); canvas.focus(); });
+  canvas.addEventListener("click", () => { if (!started) start(); initAudio(); canvas.focus(); });
 
   // ---------------------------------------------------------------- drawing
   let viewW = 0, viewH = 0, dpr = 1;
@@ -355,7 +430,7 @@
       ? `<div class="rt-muted">${DATA.devices.length} of ${DATA.total_devices} devices placed</div>` : "";
     hud.innerHTML = `<div class="rt-big">${Math.round(Math.abs(car.speed) / 5)} km/h</div>
       <div>${escapeHtml(where)}</div>${parked}
-      <div class="rt-muted mt-1">🚩 Visited ${seen} of ${totalStops}</div>${capped}`;
+      <div class="rt-muted mt-1">🚩 Visited ${seen} of ${totalStops} · ${muted ? "🔇 sound off" : "🔊 sound on"} (M)</div>${capped}`;
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -366,6 +441,7 @@
   function frameLoop(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (started && !paused) update(dt);
+    engineSound(started && !paused && (keys.ArrowUp || keys.KeyW || keys.ArrowDown || keys.KeyS));
     // camera eases after the car and looks a little ahead
     const lookX = car.x + Math.cos(car.angle) * car.speed * 0.35, lookY = car.y + Math.sin(car.angle) * car.speed * 0.35;
     camX += (lookX - camX) * Math.min(1, dt * 4); camY += (lookY - camY) * Math.min(1, dt * 4);
@@ -387,7 +463,7 @@
 
   // For automated tests: the state, and a way to put the car somewhere
   window.netboxRoadTrip = {
-    car, stops, districts, keys,
+    car, stops, districts, keys, sfx, isMuted: () => muted, hasAudio: () => !!audio,
     teleport(x, y, angle) { Object.assign(car, { x, y, angle: angle ?? car.angle, speed: 0 }); },
     start,
   };

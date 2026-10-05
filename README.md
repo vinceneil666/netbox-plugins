@@ -20,6 +20,14 @@ directory, is a separate Python package and can be installed on its own.
     <td><b>Prefix Planner</b> - size a tenant's prefixes with sliders</td>
     <td><b>FortiManager Integrator</b> (beta) - sync a FortiGate to FortiManager</td>
   </tr>
+  <tr>
+    <td width="50%"><a href="roadtrip/"><img src="roadtrip/docs/drive.png" alt="Road Trip: driving through a tenant district"></a></td>
+    <td width="50%"><a href="roadtrip/"><img src="roadtrip/docs/visit.png" alt="Road Trip: a device page opened from the game"></a></td>
+  </tr>
+  <tr>
+    <td><b>Road Trip</b> (just for fun) - drive through your tenants and devices</td>
+    <td><b>Road Trip</b> - stop at a building to open its NetBox page</td>
+  </tr>
 </table>
 
 ## Installing a plugin
