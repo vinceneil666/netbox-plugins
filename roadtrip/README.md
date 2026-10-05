@@ -29,6 +29,11 @@ built from your NetBox data.
     <td>Off the ramp: the city below, prefixes flying like birds</td>
   </tr>
 </table>
+- **Bars**: 3-4 small bars of different design - a Tudor pub, a neon cocktail bar, a tiki bar, an Irish pub - turn
+  up at random places in the city each time you start. Park outside one and a pixel-art scene plays: a guy walks in
+  and orders a *Singapore Ping*, a *Mai Ping*, a *Ping and Tonic*, a *Penguin Sunrise*... drinks it, and the window
+  closes. When he gets back into the car, a police car arrives with sirens: no driving like that - you wait 10
+  seconds to sober up before you can drive on. Esc skips the bar scene (not the wait).
 - **Sound**: the engine follows your speed, the tyres squeal when you brake hard, buildings go *thud*, a parking
   spot beeps and a visit chimes; penguins peep and squawk, the jump whooshes, the wind blows and the prefix birds
   tweet. H is the horn, M turns the sound on and off (remembered in your browser). It is
@@ -92,6 +97,11 @@ and the driving are plain JavaScript on a `<canvas>`, no libraries. The object p
 with NetBox's menu hidden.
 
 ## Changelog
+
+### Unreleased
+
+- Bars: 3-4 bars in four styles at random places; pixel-art bar scene with pun drinks; police arrive afterwards
+  and you sober up for 10 seconds (no driving, the world sways). Drinks count in the corner.
 
 ### 0.2.0 (2026-10-05, first release: `roadtrip-v0.2.0`)
 

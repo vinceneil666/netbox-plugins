@@ -5,7 +5,7 @@
   <div class="text-muted">
     Drive through a city built from your NetBox: every tenant is a district, every device a building (roof in its
     role's colour), and the sites have their own district. Stop on a <strong>P</strong> in front of a building to
-    look inside. Mind the penguins - and find the jump park.
+    look inside. Mind the penguins, find the jump park - and maybe stop by a bar.
   </div>
 {% endblock %}
 
@@ -25,6 +25,12 @@
     .rt-start { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
                 background: rgba(15, 23, 42, .45); color: #fff; font: 600 22px system-ui, sans-serif; cursor: pointer; }
     .rt-start span { background: rgba(15, 23, 42, .85); padding: 14px 24px; border-radius: 8px; }
+    .rt-bar { position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center;
+              background: rgba(0, 0, 0, .65); }
+    .rt-bar.rt-open { display: flex; }
+    .rt-bar canvas { width: min(800px, 94%); aspect-ratio: 16 / 9; height: auto; image-rendering: pixelated;
+                     border: 6px solid #0f172a; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+    .rt-bar-skip { position: absolute; bottom: 14px; right: 18px; color: #e2e8f0; font: 12px system-ui, sans-serif; }
     .rt-modal { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .6); display: none;
                 align-items: center; justify-content: center; }
     .rt-modal.rt-open { display: flex; }
@@ -43,6 +49,10 @@
       <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive
       · <kbd>Space</kbd> brake · stop on a <strong>P</strong> to visit · <kbd>Esc</kbd> back on the road
       · <kbd>J</kbd> to the jump ramp · <kbd>H</kbd> horn · <kbd>M</kbd> sound · <kbd>R</kbd> back to the start
+    </div>
+    <div class="rt-bar" id="rt-bar" aria-live="polite">
+      <canvas id="rt-bar-canvas" width="800" height="450" aria-label="Bar scene"></canvas>
+      <div class="rt-bar-skip">Esc to skip</div>
     </div>
     <div class="rt-start" id="rt-start"><span>🚗 Click here, then drive with the arrow keys</span></div>
   </div>
