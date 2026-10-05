@@ -65,16 +65,16 @@ NetBox 4.7 or later. No models, no migrations.
 ## Installation
 
 ```
-pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.2.0#subdirectory=roadtrip"
+pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.3.0#subdirectory=roadtrip"
 ```
 
-or the wheel attached to the [release](https://github.com/vinceneil666/netbox-plugins/releases/tag/roadtrip-v0.2.0):
+or the wheel attached to the [release](https://github.com/vinceneil666/netbox-plugins/releases/tag/roadtrip-v0.3.0):
 
 ```
-pip install https://github.com/vinceneil666/netbox-plugins/releases/download/roadtrip-v0.2.0/netbox_roadtrip-0.2.0-py3-none-any.whl
+pip install https://github.com/vinceneil666/netbox-plugins/releases/download/roadtrip-v0.3.0/netbox_roadtrip-0.3.0-py3-none-any.whl
 ```
 
-Leave out `@roadtrip-v0.2.0` to install the latest code from `main`.
+Leave out `@roadtrip-v0.3.0` to install the latest code from `main`.
 
 ```python
 # configuration.py (netbox-docker: configuration/plugins.py)
@@ -109,7 +109,7 @@ with NetBox's menu hidden.
 
 ## Changelog
 
-### 0.3.0 (2026-10-05, merged to `main`, not released)
+### 0.3.0 (2026-10-05, released: `roadtrip-v0.3.0`)
 
 - Bars: 3-4 bars in four styles at random places; pixel-art bar scene with pun drinks; police arrive afterwards
   and you sober up for 10 seconds (no driving, the world sways). Drinks count in the corner.

@@ -43,7 +43,7 @@ pip install "git+https://github.com/vinceneil666/netbox-plugins.git@prefix-plann
 Road Trip is released too:
 
 ```bash
-pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.2.0#subdirectory=roadtrip"
+pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.3.0#subdirectory=roadtrip"
 ```
 
 Leave out `@<tag>` to install the latest code from `main` - that is currently the only way to install the
