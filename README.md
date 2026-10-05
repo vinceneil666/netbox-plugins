@@ -8,6 +8,19 @@ directory, is a separate Python package and can be installed on its own.
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
 | [FortiManager Integrator](fortimanager-integrator/) **(beta)** | Create FortiGates as FortiManager model devices from NetBox (blueprint, serial, ADOM from the tenant or an override) and keep their per-device metadata variables in sync, with checks and readable logs. | 4.7+ |
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><a href="prefix-planner/"><img src="prefix-planner/docs/planner.png" alt="Prefix Planner"></a></td>
+    <td width="50%"><a href="fortimanager-integrator/"><img src="fortimanager-integrator/docs/sync-preview.png" alt="FortiManager Integrator: Sync to FortiManager"></a></td>
+  </tr>
+  <tr>
+    <td><b>Prefix Planner</b> - size a tenant's prefixes with sliders</td>
+    <td><b>FortiManager Integrator</b> (beta) - sync a FortiGate to FortiManager</td>
+  </tr>
+</table>
+
 ## Installing a plugin
 
 Install a released version of a plugin with pip, using the release tag and the plugin's directory as
