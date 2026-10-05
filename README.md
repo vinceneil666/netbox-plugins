@@ -6,7 +6,7 @@ directory, is a separate Python package and can be installed on its own.
 | Plugin | Description | NetBox |
 |---|---|---|
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
-| [FortiManager Integrator](fortimanager-integrator/) | Connect NetBox to FortiManager: manage FortiManagers, and keep FortiManager values such as FortiGate blueprints on Fortinet devices. | 4.7+ |
+| [FortiManager Integrator](fortimanager-integrator/) **(beta)** | Create FortiGates as FortiManager model devices from NetBox (blueprint, serial, ADOM from the tenant or an override) and keep their per-device metadata variables in sync, with checks and readable logs. | 4.7+ |
 
 ## Installing a plugin
 
@@ -18,7 +18,8 @@ source /opt/netbox/venv/bin/activate
 pip install "git+https://github.com/vinceneil666/netbox-plugins.git@prefix-planner-v0.5.0#subdirectory=prefix-planner"
 ```
 
-Leave out `@<tag>` to install the latest code from `main`. Then follow the plugin's own README to enable and
+Leave out `@<tag>` to install the latest code from `main` - that is currently the only way to install the
+FortiManager Integrator, which is in beta and has no release yet. Then follow the plugin's own README to enable and
 configure it.
 
 ## Releases
