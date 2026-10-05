@@ -34,6 +34,17 @@ built from your NetBox data.
   and orders a *Singapore Ping*, a *Mai Ping*, a *Ping and Tonic*, a *Penguin Sunrise*... drinks it, and the window
   closes. When he gets back into the car, a police car arrives with sirens: no driving like that - you wait 10
   seconds to sober up before you can drive on. Esc skips the bar scene (not the wait).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/bar.png" alt="Pixel-art bar scene: a guy orders a Bloody Ping in The Packet Loss Pub"></td>
+    <td width="50%"><img src="docs/police.png" alt="The police car next to the car outside the pub, sobering-up countdown"></td>
+  </tr>
+  <tr>
+    <td>"Hey, could I get a Bloody Ping?"</td>
+    <td>...and then the police arrive: 10 seconds to sober up</td>
+  </tr>
+</table>
 - **Sound**: the engine follows your speed, the tyres squeal when you brake hard, buildings go *thud*, a parking
   spot beeps and a visit chimes; penguins peep and squawk, the jump whooshes, the wind blows and the prefix birds
   tweet. H is the horn, M turns the sound on and off (remembered in your browser). It is
@@ -98,7 +109,7 @@ with NetBox's menu hidden.
 
 ## Changelog
 
-### Unreleased
+### 0.3.0 (2026-10-05, merged to `main`, not released)
 
 - Bars: 3-4 bars in four styles at random places; pixel-art bar scene with pun drinks; police arrive afterwards
   and you sober up for 10 seconds (no driving, the world sways). Drinks count in the corner.
