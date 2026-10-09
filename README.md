@@ -6,7 +6,6 @@ directory, is a separate Python package and can be installed on its own.
 | Plugin | Description | NetBox |
 |---|---|---|
 | [Prefix Planner](prefix-planner/) | Plan a tenant's address block with sliders and provision the tenant and its prefixes in one go. Includes a REST API. | 4.7+ |
-| [FortiManager Integrator](fortimanager-integrator/) **(beta)** | Create FortiGates as FortiManager model devices from NetBox (blueprint, serial, ADOM from the tenant or an override) push their rendered config as a CLI script, and keep their per-device metadata variables (incl. SD-WAN spoke variables) in sync, with checks and readable logs. | 4.7+ |
 | [Road Trip](roadtrip/) **(just for fun)** | Drive a car through a city made of your tenants, sites and devices; stop at a building to open its NetBox page, brake for penguins, jump over the city among your prefixes, have a drink at a bar (and meet the police). | 4.7+ |
 
 ## Screenshots
@@ -14,11 +13,11 @@ directory, is a separate Python package and can be installed on its own.
 <table>
   <tr>
     <td width="50%"><a href="prefix-planner/"><img src="prefix-planner/docs/planner.png" alt="Prefix Planner"></a></td>
-    <td width="50%"><a href="fortimanager-integrator/"><img src="fortimanager-integrator/docs/sync-preview.png" alt="FortiManager Integrator: Sync to FortiManager"></a></td>
+    <td></td>
   </tr>
   <tr>
     <td><b>Prefix Planner</b> - size a tenant's prefixes with sliders</td>
-    <td><b>FortiManager Integrator</b> (beta) - sync a FortiGate to FortiManager</td>
+    <td></td>
   </tr>
   <tr>
     <td width="50%"><a href="roadtrip/"><img src="roadtrip/docs/drive.png" alt="Road Trip: driving through a tenant district"></a></td>
@@ -46,8 +45,7 @@ Road Trip is released too:
 pip install "git+https://github.com/vinceneil666/netbox-plugins.git@roadtrip-v0.3.0#subdirectory=roadtrip"
 ```
 
-Leave out `@<tag>` to install the latest code from `main` - that is currently the only way to install the
-FortiManager Integrator, which is in beta and has no release yet. Then follow the plugin's own README to enable and
+Leave out `@<tag>` to install the latest code from `main`. Then follow the plugin's own README to enable and
 configure it.
 
 ## Releases
